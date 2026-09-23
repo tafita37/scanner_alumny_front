@@ -1,0 +1,61 @@
+/* Page Paramètres & administration */
+
+.users { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.users li {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--line); border-radius: var(--r-m);
+  padding: 12px;
+}
+.users li.off { opacity: .55; background: #fafbfe; }
+.u-nom { font-weight: bold; color: var(--blue); font-size: 13.5px; }
+.u-mail { font-size: 11.5px; color: var(--ink-faint); }
+
+.roles-futurs { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.roles-futurs li { border-left: 2px solid var(--pale); padding-left: 12px; font-size: 13px; }
+.roles-futurs b { color: var(--blue); display: block; }
+.roles-futurs span { font-size: 12px; color: var(--ink-soft); }
+
+.tbl td.center, .tbl th.center { text-align: center; }
+.perm-ok { color: var(--ok); font-weight: bold; }
+.perm-no { color: var(--ink-faint); }
+
+.val-edit {
+  display: inline-flex; align-items: center; gap: 8px;
+  justify-content: flex-end;
+}
+.val-edit input { width: 110px; text-align: right; padding: 6px 9px; font-size: 13px; }
+.val-strong { font-weight: bold; color: var(--blue); }
+
+.job { display: flex; flex-direction: column; gap: 8px; }
+.job-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 13px; padding: 9px 12px;
+  background: #fafbfe; border-radius: var(--r-s);
+}
+.job-row b { color: var(--blue); }
+
+.json {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.65;
+  background: #f7f9fd; border: 1px solid var(--line);
+  border-radius: var(--r-m); padding: 16px;
+  white-space: pre-wrap; margin: 0; color: var(--ink);
+}
+
+.arbitrages { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.arbitrages li {
+  font-size: 13px; font-weight: bold; color: var(--blue);
+  background: var(--gold-soft); border-radius: var(--r-s); padding: 10px 12px;
+}
+.arbitrages span { display: block; font-weight: normal; color: var(--ink-soft); font-size: 12px; }
+
+code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #eef2f9; padding: 1px 5px; border-radius: 4px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px) {
+  .users li { flex-wrap: wrap; gap: 9px; }
+  .users li .btn { width: 100%; }
+  .job-row { flex-direction: column; gap: 2px; }
+  .json { font-size: 11.5px; padding: 12px; }
+  .arbitrages li { font-size: 12.5px; }
+}

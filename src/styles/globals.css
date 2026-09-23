@@ -1,0 +1,20 @@
+/* ============================================================
+   Alumny — Point d'entrée des styles
+   L'ordre d'import reproduit celui de la maquette : la feuille
+   commune, puis les feuilles de page, puis la couche responsive
+   complémentaire qui doit rester la dernière.
+   ============================================================ */
+
+@import "./common.css";
+
+@import "./index.css";
+@import "./dashboard.css";
+@import "./clients.css";
+@import "./nouveau-dossier.css";
+@import "./documents.css";
+@import "./cockpit.css";
+@import "./rapports.css";
+@import "./intelligence.css";
+@import "./parametres.css";
+
+@import "./responsive-extra.css";

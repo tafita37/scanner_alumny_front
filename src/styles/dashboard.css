@@ -1,0 +1,91 @@
+/* Page Tableau de bord */
+
+.hello {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  background: linear-gradient(110deg, var(--sky-soft) 0%, var(--blue-soft) 60%, #fff 100%);
+  border: 1px solid #dbe6f6;
+  border-radius: var(--r-l);
+  padding: 24px 28px;
+}
+.hello h1 { font-size: 25px; max-width: 720px; }
+.hello .hand { margin: 0 0 2px; }
+.hello-art {
+  width: 210px; height: 108px; flex: none;
+  background-color: rgba(255,255,255,.6);
+}
+@media (max-width: 900px) { .hello-art { display: none; } }
+
+.dash-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 1240px) { .dash-cols { grid-template-columns: 1fr; } }
+
+/* Liste de tâches */
+.todo { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.todo li {
+  display: flex; align-items: center; gap: 11px;
+  background: rgba(255,255,255,.8);
+  border: 1px solid #dde6f8;
+  border-radius: var(--r-m);
+  padding: 11px 12px;
+}
+.todo-ico {
+  width: 30px; height: 30px; flex: none; border-radius: 9px;
+  background: var(--pale); color: var(--blue-dark);
+  display: grid; place-items: center; font-size: 13px;
+}
+
+/* Barres secteurs */
+.sect-bars { display: flex; flex-direction: column; gap: 14px; }
+.sect-row { display: flex; flex-direction: column; gap: 5px; }
+.sect-row .row { justify-content: space-between; font-size: 13px; }
+.sect-row b { color: var(--blue); }
+.sect-row .bar > i { transition: width .8s cubic-bezier(.2,.8,.3,1); width: 0; }
+
+/* Journal */
+.feed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.feed li {
+  font-size: 13px;
+  padding: 10px 0 10px 18px;
+  border-left: 2px solid #e8d9bf;
+  position: relative;
+}
+.feed li::before {
+  content: ""; position: absolute; left: -5px; top: 16px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold); border: 2px solid #fff;
+}
+.feed li:last-child { border-left-color: transparent; }
+.feed-t { display: block; font-size: 11.5px; color: var(--ink-faint); }
+
+.signaux { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.signaux li {
+  background: rgba(255,255,255,.75);
+  border: 1px solid #eee0c9;
+  border-radius: var(--r-s);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.signaux b { color: var(--blue); }
+.signaux span { display: block; font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+
+.tbl .ref { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; color: var(--blue); font-weight: bold; }
+.empty-row td { text-align: center; color: var(--ink-faint); padding: 34px; font-size: 13px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 860px) {
+  .hello { flex-direction: column; padding: 18px; border-radius: var(--r-m); gap: 14px; }
+  .hello h1 { font-size: 20px; }
+  .hello-art { display: none; }
+  .dash-cols { gap: 16px; }
+  #q { width: 100% !important; }
+  .card-head #q { order: 3; }
+  .todo li { flex-wrap: wrap; }
+  .todo li .btn { width: 100%; }
+  .feed li { font-size: 12.5px; }
+}
