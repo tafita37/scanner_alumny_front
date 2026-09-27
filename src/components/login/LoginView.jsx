@@ -1,36 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginArt from "@/components/login/LoginArt";
 import Chip from "@/components/ui/Chip";
 import { Field } from "@/components/ui/Misc";
+import Note from "@/components/ui/Note";
 import { useUser } from "@/context/UserContext";
+import { login } from "@/lib/api";
 
-const ROLES = [
-  { role: "Admin", nom: "Ny Aina R.", init: "NR", mail: "ny-aina@alumny.fr", label: "Admin — Ny Aina" },
-  { role: "Consultant", nom: "Tafita A.", init: "TA", mail: "tafita@alumny.fr", label: "Consultant — Tafita" }
-];
+/* Page demandée avant la redirection vers la connexion (?next=/clients).
+   Seuls les chemins internes sont acceptés, pour éviter une redirection
+   vers un site externe (//exemple.com, https://…). */
+function destination() {
+  try {
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")) return next;
+  } catch { /* URL illisible */ }
+  return "/dashboard";
+}
 
 export default function LoginView() {
   const router = useRouter();
-  const { setUser } = useUser();
+  const { ouvrirSession, pret, estConnecte, finSession } = useUser();
   const [role, setRole] = useState("Admin");
-  const [mail, setMail] = useState(ROLES[0].mail);
-  const [pwd, setPwd] = useState("••••••••••");
+  const [mail, setMail] = useState("");
+  const [pwd, setPwd] = useState("");
   const [visible, setVisible] = useState(false);
+  const [resterConnecte, setResterConnecte] = useState(true);
   const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState("");
 
+  /* Déjà connecté → inutile de rester sur la page de connexion */
+  useEffect(() => {
+    if (pret && estConnecte && !enCours) router.replace(destination());
+  }, [pret, estConnecte, enCours, router]);
+
+  /* Raccourci de démo : pré-remplit l'e-mail. Le rôle réel est
+     désormais déterminé par le backend (is_staff → Admin). */
   const choisirRole = r => {
     setRole(r.role);
     setMail(r.mail);
-    setUser({ nom: r.nom, initiales: r.init, role: r.role });
+    setErreur("");
   };
 
-  const soumettre = e => {
+  const soumettre = async e => {
     e.preventDefault();
+    if (enCours) return;
+    setErreur("");
     setEnCours(true);
-    setTimeout(() => router.push("/dashboard"), 750);
+    try {
+      const reponse = await login(mail.trim(), pwd);
+      ouvrirSession(reponse, resterConnecte);
+      router.replace(destination());
+    } catch (err) {
+      setErreur(err.message || "Connexion impossible.");
+      setEnCours(false);
+    }
   };
 
   return (
@@ -47,6 +73,7 @@ export default function LoginView() {
             <Field label="E-mail professionnel" htmlFor="mail">
               <input
                 type="email" id="mail" autoComplete="username"
+                required disabled={enCours}
                 value={mail} onChange={e => setMail(e.target.value)}
               />
             </Field>
@@ -55,6 +82,7 @@ export default function LoginView() {
               <div className="pwd-wrap">
                 <input
                   type={visible ? "text" : "password"} id="pwd" autoComplete="current-password"
+                  required disabled={enCours}
                   value={pwd} onChange={e => setPwd(e.target.value)}
                 />
                 <button
@@ -68,28 +96,21 @@ export default function LoginView() {
             </Field>
 
             <div className="row-between">
-              <label className="check">
-                <input type="checkbox" defaultChecked /> <span className="small">Rester connecté 7 jours</span>
-              </label>
               <a href="#" className="small">Mot de passe oublié ?</a>
             </div>
 
-            <button className={"btn" + (enCours ? " is-loading" : "")} id="submit" type="submit">
+            {!erreur && finSession === "expiree" && (
+              <Note tone="gold" ico="⏱">Votre session a expiré. Merci de vous reconnecter.</Note>
+            )}
+            {erreur && <Note tone="bad" ico="⚠">{erreur}</Note>}
+
+            <button
+              className={"btn" + (enCours ? " is-loading" : "")} id="submit" type="submit"
+              disabled={enCours}
+            >
               {enCours ? "Vérification des habilitations…" : "Se connecter"}
             </button>
           </form>
-
-          <div className="role-hint">
-            <span className="lbl">Se connecter en tant que</span>
-            <div className="row gap-s wrap mt-s">
-              {ROLES.map(r => (
-                <Chip key={r.role} active={role === r.role} onClick={() => choisirRole(r)}>{r.label}</Chip>
-              ))}
-            </div>
-            <p className="hint mt-s">
-              Le rôle Consultant n&apos;accède pas à la configuration des formules sectorielles.
-            </p>
-          </div>
         </div>
 
         <p className="login-legal tiny faint">

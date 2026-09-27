@@ -1,13 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { NAV } from "@/data/al";
 import { useUser } from "@/context/UserContext";
+import { logout } from "@/lib/api";
 
 export default function Sidebar({ onNavigate }) {
   const pathname = usePathname();
-  const { user } = useUser();
+  const router = useRouter();
+  const { user, fermerSession } = useUser();
+
+  /* Révoque le token côté serveur (au mieux) puis vide la session locale,
+     même si le backend est injoignable. */
+  const seDeconnecter = async () => {
+    try { await logout(); } catch { /* token déjà invalide ou serveur injoignable */ }
+    fermerSession("volontaire");
+    router.replace("/");
+  };
 
   return (
     <aside className="sidebar" id="sidebar">
@@ -42,7 +52,13 @@ export default function Sidebar({ onNavigate }) {
             <span className="who-name">{user.nom}</span><br />
             <span className="who-role">{user.role} · outil interne</span>
           </span>
-          <Link href="/" title="Se déconnecter" className="who-out" style={{ color: "var(--sky)" }}>⏻</Link>
+          <button
+            type="button" title="Se déconnecter" aria-label="Se déconnecter" className="who-out"
+            style={{ color: "var(--sky)", background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" }}
+            onClick={seDeconnecter}
+          >
+            ⏻
+          </button>
         </div>
       </div>
     </aside>

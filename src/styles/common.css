@@ -432,6 +432,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 }
 .note-gold { background: var(--gold-soft); border-color: #ecdcc2; }
 .note-blue { background: var(--blue-soft); border-color: #d8e3fb; }
+.note-bad  { background: var(--bad-bg); border-color: #eccfce; color: var(--bad); }
 .note b { color: var(--blue); }
 .note-ico { font-size: 17px; line-height: 1.3; }
 
@@ -743,4 +744,10 @@ table.tbl { width: 100%; border-collapse: collapse; }
   .copi-btn { width: 52px; height: 52px; border-radius: 50%; padding: 0; justify-content: center; }
   .copi-btn .copi-mark { font-size: 19px; }
   .toast-zone { bottom: 74px; }
+}
+
+/* ---------- Attente de vérification de session ---------- */
+.auth-wait {
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
 }
