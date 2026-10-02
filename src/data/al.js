@@ -9,14 +9,14 @@ export const SECTEURS = ["BTP", "Services", "Industrie"];
 
 /* Navigation de la barre latérale : les `href` sont désormais des routes Next. */
 export const NAV = [
-  { g: "Pilotage" },
-  { id: "dashboard", href: "/dashboard", ico: "◧", label: "Tableau de bord" },
-  { id: "clients", href: "/clients", ico: "◍", label: "Clients" },
   { g: "Audit" },
   { id: "nouveau", href: "/nouveau-dossier", ico: "✦", label: "Nouvel audit" },
   { id: "documents", href: "/documents", ico: "▤", label: "Analyse documentaire" },
   { id: "cockpit", href: "/cockpit", ico: "◎", label: "Cockpit & résultats" },
   { id: "rapports", href: "/rapports", ico: "▥", label: "Rapports" },
+  { g: "Pilotage" },
+  { id: "dashboard", href: "/dashboard", ico: "◧", label: "Tableau de bord" },
+  { id: "clients", href: "/clients", ico: "◍", label: "Clients" },
   { g: "Configuration" },
   { id: "intel", href: "/intelligence", ico: "◈", label: "Benchmark & veille" },
   { g: "Configuration" },
