@@ -16,7 +16,7 @@ export default function WizAside({ dossier }) {
 
   const recap = [
     ["Entreprise", dossier.nom],
-    ["SIRET", dossier.siret],
+    ["SIREN", dossier.siret],
     ["Secteur (figé)", dossier.secteur],
     ["Contact dirigeant", dossier.contact],
     ["Opt-in RGPD", dossier.optin ? "recueilli ✓" : null],

@@ -174,3 +174,10 @@ export function logout() {
 export function getProfile() {
   return apiFetch("/api/auth/me/");
 }
+
+/* GET /api/companies/search/?siret=… → jusqu'à 5 entreprises dont le SIREN commence par la saisie :
+   [{ id, siren_number, company_name, naf_code, creation_date, city_name, city_code_insee,
+      department_code, company_type_label, ceo_name, ceo_first_name, ceo_job_title }] */
+export function rechercherEntreprises(siret) {
+  return apiFetch("/api/companies/search/?siret=" + encodeURIComponent(siret));
+}

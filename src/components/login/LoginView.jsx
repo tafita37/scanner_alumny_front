@@ -17,7 +17,8 @@ function destination() {
     const next = new URLSearchParams(window.location.search).get("next");
     if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\")) return next;
   } catch { /* URL illisible */ }
-  return "/dashboard";
+  return "/nouveau-dossier";
+  // return "/dashboard";
 }
 
 export default function LoginView() {

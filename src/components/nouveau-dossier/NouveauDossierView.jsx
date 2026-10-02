@@ -28,7 +28,7 @@ export default function NouveauDossierView() {
 
   const [etape, setEtape] = useState(1);
   const [dossier, setDossier] = useState({
-    nom: null, siret: null, secteur: "BTP", contact: null, optin: false
+    nom: null, siret: null, entreprise: null, secteur: "BTP", contact: null, optin: false
   });
   const [horodatage, setHorodatage] = useState("");
   const [badgeQuestionnaire, setBadgeQuestionnaire] = useState("déclenché : données publiques partielles");
@@ -103,7 +103,7 @@ export default function NouveauDossierView() {
           {etape === 1 && (
             <EtapeEntreprise
               dossier={dossier}
-              onChoisir={(nom, siret) => majDossier({ nom, siret })}
+              onChoisir={entreprise => majDossier({ nom: entreprise.company_name, siret: entreprise.siren_number, entreprise })}
               onSuivant={() => aller(2)}
               onSansDonnees={() => {
                 toast("Bascule vers le questionnaire d'appoint (étape 4) — pas de données publiques exploitables.", "gold");
