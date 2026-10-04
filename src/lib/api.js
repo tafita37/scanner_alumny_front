@@ -181,3 +181,14 @@ export function getProfile() {
 export function rechercherEntreprises(siret) {
   return apiFetch("/api/companies/search/?siret=" + encodeURIComponent(siret));
 }
+
+/* GET /api/companies/audits_informations/<siret>/ → derniers comptes publiés, ou null :
+   { id, siret_number, head_count, profit, revenue, publication_year } */
+export function getInfosAudit(siret) {
+  return apiFetch("/api/companies/audits_informations/" + encodeURIComponent(siret) + "/");
+}
+
+/* GET /api/companies/industries/ → [{ id, name, description }] */
+export function getSecteurs() {
+  return apiFetch("/api/companies/industries/");
+}

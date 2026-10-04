@@ -6,6 +6,7 @@ import Note from "@/components/ui/Note";
 import { Divider, Spinner } from "@/components/ui/Misc";
 import { useUi } from "@/context/UiContext";
 import { rechercherEntreprises } from "@/lib/api";
+import { nomDirigeant } from "@/lib/format";
 
 const INDICE_VIDE = "Tape au moins 3 chiffres du SIRET…";
 
@@ -18,14 +19,12 @@ const fmtDate = iso => iso ? iso.split("-").reverse().join("/") : null;
 /* « BOULOGNE-BILLANCOURT (92) » */
 const fmtVille = e => e.city_name ? e.city_name + (e.department_code ? ` (${e.department_code})` : "") : null;
 
-const fmtDirigeant = e => [e.ceo_first_name, e.ceo_name].filter(Boolean).join(" ") || null;
-
 const CHAMPS_API = e => [
   ["SIREN", fmtSiren(e.siren_number)],
   ["Raison sociale", e.company_name],
   ["Code NAF", e.naf_code],
   ["Date de création", fmtDate(e.creation_date)],
-  ["Dirigeant (API)", fmtDirigeant(e)],
+  ["Dirigeant (API)", nomDirigeant(e)],
   ["Fonction du dirigeant", e.ceo_job_title],
   ["Forme juridique", e.company_type_label],
   ["Ville", fmtVille(e)],
@@ -180,6 +179,7 @@ export default function EtapeEntreprise({ dossier, onChoisir, onSuivant, onSansD
           <Note tone="gold" ico="ⓘ" className="mt">
             L&apos;API ne fournit ni le <b>statut commercial</b>, ni le <b>secteur Alumny</b>, ni de façon fiable
             l&apos;e-mail / téléphone du dirigeant — à compléter à l&apos;étape suivante.
+            {nomDirigeant(entreprise) && <> Le nom du dirigeant y sera <b>pré-rempli</b>.</>}
           </Note>
 
           <div className="row-between mt">

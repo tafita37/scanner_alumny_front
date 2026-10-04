@@ -35,9 +35,9 @@ export default function WizAside({ dossier }) {
             </div>
           ))}
         </dl>
-        <p className="hint mt-s">
+        {/* <p className="hint mt-s">
           Statut : <b>{dossier.optin ? "prêt à créer" : "brouillon"}</b> → documents en attente
-        </p>
+        </p> */}
       </Card>
 
       <IaBlock>
