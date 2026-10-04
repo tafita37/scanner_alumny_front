@@ -1,19 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { IaBlock, IaConf, IaSrc, IaTag } from "@/components/ui/Ia";
-import { Divider, Field } from "@/components/ui/Misc";
+import { Divider, Field, Spinner } from "@/components/ui/Misc";
 import { useUi } from "@/context/UiContext";
+import { getSecteurs } from "@/lib/api";
+import { nomDirigeant } from "@/lib/format";
 
-const CARTES_SECTEUR = [
-  { id: "BTP", ico: "⛏", desc: "Coût horaire chargé réel, écart de facturation main-d'œuvre, risque BFR" },
-  { id: "Services", ico: "✎", desc: "TJM réel vs vendu, taux de facturabilité, scope creep" },
-  { id: "Industrie", ico: "⚙", desc: "TRS/OEE, marge sur coûts variables, immobilisation des stocks" }
-];
+/* La liste ne change pas d'un dossier à l'autre : chargée une fois, gardée entre les allers-retours d'étapes. */
+let secteursEnCache = null;
 
-export default function EtapeSecteur({ dossier, onSecteur, onContact, onPrecedent, onSuivant }) {
+export default function EtapeSecteur({ dossier, contact, onSecteur, onContact, onPrecedent, onSuivant }) {
   const { toast } = useUi();
+  const dirigeantApi = nomDirigeant(dossier.entreprise);
+  const [secteurs, setSecteurs] = useState(secteursEnCache);
+  const [erreur, setErreur] = useState(null);
+  const [essai, setEssai] = useState(0);
+
+  useEffect(() => {
+    if (secteursEnCache) return;
+    let annule = false;
+    setErreur(null);
+    getSecteurs()
+      .then(liste => {
+        secteursEnCache = liste;
+        if (!annule) setSecteurs(liste);
+      })
+      .catch(err => { if (!annule) setErreur(err.message); });
+    return () => { annule = true; };
+  }, [essai]);
+
+  /* Secteur suggéré par l'IA (encore statique) : retrouvé dans la liste de l'API par son nom. */
+  const suggestion = secteurs?.find(s => s.name === "BTP");
 
   return (
     <Card>
@@ -31,8 +51,9 @@ export default function EtapeSecteur({ dossier, onSecteur, onContact, onPreceden
           </span>
           <button
             className="btn btn-s btn-gold" type="button"
+            disabled={!suggestion}
             onClick={() => {
-              onSecteur("BTP");
+              onSecteur(suggestion);
               toast("Secteur suggéré appliqué — modifiable jusqu'à la création du dossier.", "ok");
             }}
           >
@@ -49,20 +70,30 @@ export default function EtapeSecteur({ dossier, onSecteur, onContact, onPreceden
         (snapshot) : corriger plus tard le secteur du client ne modifiera pas cet audit.
       </p>
 
-      <div className="sect-cards mt">
-        {CARTES_SECTEUR.map(s => (
-          <button
-            key={s.id} type="button"
-            className={"sect-card" + (dossier.secteur === s.id ? " is-on" : "")}
-            onClick={() => onSecteur(s.id)}
-            aria-pressed={dossier.secteur === s.id}
-          >
-            <span className="sc-ico">{s.ico}</span>
-            <b>{s.id}</b>
-            <span className="small muted">{s.desc}</span>
+      {erreur ? (
+        <div className="row-between mt" style={{ gap: 12 }}>
+          <span className="hint">{erreur}</span>
+          <button className="btn btn-ghost btn-s" type="button" onClick={() => setEssai(n => n + 1)}>
+            Réessayer
           </button>
-        ))}
-      </div>
+        </div>
+      ) : !secteurs ? (
+        <div className="ac-load mt"><Spinner /> Chargement des secteurs…</div>
+      ) : (
+        <div className="sect-cards mt">
+          {secteurs.map(s => (
+            <button
+              key={s.id} type="button"
+              className={"sect-card" + (dossier.secteurId === s.id ? " is-on" : "")}
+              onClick={() => onSecteur(s)}
+              aria-pressed={dossier.secteurId === s.id}
+            >
+              <b>{s.name}</b>
+              <span className="small muted">{s.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <p className="hint mt-s">
         L&apos;agent orchestrateur multi-secteurs recroisera ce choix avec le contenu réel des devis déposés.
       </p>
@@ -73,16 +104,32 @@ export default function EtapeSecteur({ dossier, onSecteur, onContact, onPreceden
         Champs de l&apos;entité Client. Capturés immédiatement, même en cas d&apos;abandon du parcours (fonction lead).
       </p>
 
+      {dirigeantApi && (
+        <p className="hint">
+          Dirigeant <b>pré-rempli</b> depuis l&apos;annuaire des entreprises — modifiable si besoin.
+        </p>
+      )}
+
       <div className="form-grid mt-s">
-        <Field label="Nom du dirigeant">
-          <input type="text" placeholder="Marc Duran" onChange={e => onContact("nom", e.target.value)} />
+        <Field label="Prénom du dirigeant">
+          <input type="text" placeholder="Marc" value={contact.prenom}
+            onChange={e => onContact("prenom", e.target.value)} />
         </Field>
-        <Field label="Fonction"><input type="text" placeholder="Gérant" /></Field>
+        <Field label="Nom du dirigeant">
+          <input type="text" placeholder="Duran" value={contact.nom}
+            onChange={e => onContact("nom", e.target.value)} />
+        </Field>
         <Field label="E-mail *">
-          <input type="email" placeholder="m.duran@batiduran.fr" onChange={e => onContact("mail", e.target.value)} />
+          <input type="email" placeholder="m.duran@batiduran.fr" value={contact.mail}
+            onChange={e => onContact("mail", e.target.value)} />
         </Field>
         <Field label="Téléphone *">
-          <input type="text" placeholder="06 12 44 87 20" onChange={e => onContact("tel", e.target.value)} />
+          <input type="text" placeholder="06 12 44 87 20" value={contact.tel}
+            onChange={e => onContact("tel", e.target.value)} />
+        </Field>
+        <Field label="Fonction" className="span-2">
+          <input type="text" placeholder="Gérant" value={contact.fonction}
+            onChange={e => onContact("fonction", e.target.value)} />
         </Field>
       </div>
 

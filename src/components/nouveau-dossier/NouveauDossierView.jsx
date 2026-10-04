@@ -13,7 +13,11 @@ import EtapeConsentement from "@/components/nouveau-dossier/EtapeConsentement";
 import EtapeQuestionnaire from "@/components/nouveau-dossier/EtapeQuestionnaire";
 import WizAside from "@/components/nouveau-dossier/WizAside";
 import { useUi } from "@/context/UiContext";
-import { heureCourante } from "@/lib/format";
+import { getInfosAudit } from "@/lib/api";
+import { groupe, heureCourante } from "@/lib/format";
+
+const QUESTIONNAIRE_VIDE = { ca: "", effectif: "", benefices: "" };
+const fmtNombre = n => (n === null || n === undefined ? "" : groupe(n));
 
 const ETAPES = [
   { n: 1, label: "Entreprise" },
@@ -28,7 +32,7 @@ export default function NouveauDossierView() {
 
   const [etape, setEtape] = useState(1);
   const [dossier, setDossier] = useState({
-    nom: null, siret: null, entreprise: null, secteur: "BTP", contact: null, optin: false
+    nom: null, siret: null, entreprise: null, secteur: null, secteurId: null, contact: null, optin: false
   });
   const [horodatage, setHorodatage] = useState("");
   const [badgeQuestionnaire, setBadgeQuestionnaire] = useState("déclenché : données publiques partielles");
@@ -54,10 +58,60 @@ export default function NouveauDossierView() {
     marquerSaisie();
   };
 
-  const contact = useRef({ nom: "", mail: "", tel: "" });
-  const surContact = (champ, valeur) => {
-    contact.current[champ] = valeur;
-    majDossier({ contact: contact.current.mail || contact.current.nom || null });
+  const [contact, setContact] = useState({ nom: "", prenom : "", fonction: "", mail: "", tel: "" });
+  const majContact = suivant => {
+    setContact(suivant);
+    majDossier({ contact: suivant.mail || [suivant.nom, suivant.prenom] || null });
+  };
+  const surContact = (champ, valeur) => majContact({ ...contact, [champ]: valeur });
+
+  /* Questionnaire d'appoint, pré-rempli avec les derniers comptes publiés de l'entreprise */
+  const [audit, setAudit] = useState(null);
+  const [chargementAudit, setChargementAudit] = useState(false);
+  const [questionnaire, setQuestionnaire] = useState(QUESTIONNAIRE_VIDE);
+  /* Numéro du dernier chargement : une réponse arrivée après un changement d'entreprise est ignorée. */
+  const dernierAudit = useRef(0);
+
+  const chargerAudit = async siret => {
+    const id = ++dernierAudit.current;
+    setAudit(null);
+    setChargementAudit(true);
+    try {
+      const infos = await getInfosAudit(siret);
+      if (id !== dernierAudit.current) return;
+      setAudit(infos);
+      setQuestionnaire(infos ? {
+        ca: fmtNombre(infos.revenue),
+        effectif: fmtNombre(infos.head_count),
+        benefices: fmtNombre(infos.profit)
+      } : QUESTIONNAIRE_VIDE);
+    } catch (err) {
+      if (id !== dernierAudit.current) return;
+      setQuestionnaire(QUESTIONNAIRE_VIDE);
+      toast(err.message, "gold");
+    } finally {
+      if (id === dernierAudit.current) setChargementAudit(false);
+    }
+  };
+
+  const surQuestionnaire = (champ, valeur) => {
+    setQuestionnaire(q => ({ ...q, [champ]: valeur }));
+    marquerSaisie();
+  };
+
+  /* Le dirigeant connu de l'annuaire pré-remplit le contact de l'étape 2.
+     Changer d'entreprise efface un pré-remplissage précédent resté intact. */
+  const surEntreprise = entreprise => {
+    majDossier({ nom: entreprise.company_name, siret: entreprise.siren_number, entreprise });
+    chargerAudit(entreprise.siren_number);
+    const precedent = dossier.entreprise;
+    const garder = (champ, ancien) => (contact[champ] && contact[champ] !== ancien ? contact[champ] : "");
+    majContact({
+      ...contact,
+      prenom: entreprise.ceo_first_name || garder("prenom", precedent?.ceo_first_name),
+      nom: entreprise.ceo_name || garder("nom", precedent?.ceo_name),
+      fonction: entreprise.ceo_job_title || garder("fonction", precedent?.ceo_job_title)
+    });
   };
 
   const surOptin = coche => {
@@ -91,8 +145,8 @@ export default function NouveauDossierView() {
       title="Onboarding & ingestion"
       actions={
         <>
-          <Badge tone="ink">{sauvegarde}</Badge>
-          <button className="btn btn-ghost btn-s" type="button" onClick={quitter}>Quitter</button>
+          {/* <Badge tone="ink">{sauvegarde}</Badge> */}
+          {/* <button className="btn btn-ghost btn-s" type="button" onClick={quitter}>Quitter</button> */}
         </>
       }
     >
@@ -103,7 +157,7 @@ export default function NouveauDossierView() {
           {etape === 1 && (
             <EtapeEntreprise
               dossier={dossier}
-              onChoisir={entreprise => majDossier({ nom: entreprise.company_name, siret: entreprise.siren_number, entreprise })}
+              onChoisir={surEntreprise}
               onSuivant={() => aller(2)}
               onSansDonnees={() => {
                 toast("Bascule vers le questionnaire d'appoint (étape 4) — pas de données publiques exploitables.", "gold");
@@ -115,7 +169,8 @@ export default function NouveauDossierView() {
           {etape === 2 && (
             <EtapeSecteur
               dossier={dossier}
-              onSecteur={secteur => majDossier({ secteur })}
+              onSecteur={s => majDossier({ secteur: s.name, secteurId: s.id })}
+              contact={contact}
               onContact={surContact}
               onPrecedent={() => aller(1)}
               onSuivant={() => aller(3)}
@@ -135,6 +190,10 @@ export default function NouveauDossierView() {
           {etape === 4 && (
             <EtapeQuestionnaire
               badge={badgeQuestionnaire}
+              audit={audit}
+              chargement={chargementAudit}
+              valeurs={questionnaire}
+              onChange={surQuestionnaire}
               onPrecedent={() => aller(3)}
               onCreer={creer}
             />

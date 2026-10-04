@@ -27,3 +27,7 @@ export function heureCourante(avecSecondes = true) {
   const p = v => String(v).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())}` + (avecSecondes ? `:${p(d.getSeconds())}` : "");
 }
+
+/* Dirigeant renvoyé par l'annuaire des entreprises : « PAUL VERDIN », ou null */
+export const nomDirigeant = entreprise =>
+  [entreprise?.ceo_first_name, entreprise?.ceo_name].filter(Boolean).join(" ") || null;
