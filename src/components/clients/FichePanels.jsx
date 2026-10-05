@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { DOSSIERS } from "@/data/al";
+import { lienDossier } from "@/lib/dossiers";
 import { fmtEur } from "@/lib/format";
 import Badge, { StatusBadge } from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -83,7 +84,7 @@ export function PanneauHistorique({ client, onAction }) {
               <StatusBadge statut={d.statut} />
               {d.score !== null && <Badge tone="gold">Score {d.score}/100</Badge>}
               {d.fuite !== null && <Badge tone="ink">Fuite {fmtEur(d.fuite)}</Badge>}
-              <Link className="btn btn-ghost btn-s" href="/cockpit">Ouvrir le cockpit</Link>
+              <Link className="btn btn-ghost btn-s" href={lienDossier(d.ref)}>Ouvrir le dossier</Link>
             </div>
           </li>
         ))}

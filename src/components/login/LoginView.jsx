@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginArt from "@/components/login/LoginArt";
 import Chip from "@/components/ui/Chip";
-import { Field } from "@/components/ui/Misc";
+import { Field, Spinner } from "@/components/ui/Misc";
 import Note from "@/components/ui/Note";
 import { useUser } from "@/context/UserContext";
 import { login } from "@/lib/api";
@@ -59,6 +59,17 @@ export default function LoginView() {
       setEnCours(false);
     }
   };
+
+  /* Session pas encore relue, ou déjà connecté (redirection en cours) :
+     le formulaire n'apparaît pas, pour ne pas le montrer à un utilisateur connecté. */
+  if (!pret || (estConnecte && !enCours)) {
+    return (
+      <div className="auth-wait" role="status" aria-live="polite">
+        <Spinner />
+        <span className="muted small">Vérification de la session…</span>
+      </div>
+    );
+  }
 
   return (
     <main className="login">

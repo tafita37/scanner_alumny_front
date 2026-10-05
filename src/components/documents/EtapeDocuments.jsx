@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import PageShell from "@/components/shell/PageShell";
-import Badge from "@/components/ui/Badge";
 import DepotPieces from "@/components/documents/DepotPieces";
 import PipelineExtraction, { ETAPES_PIPELINE } from "@/components/documents/PipelineExtraction";
 import AnomaliesDetectees from "@/components/documents/AnomaliesDetectees";
@@ -29,7 +26,9 @@ const CHAMPS_INITIAUX = [
   { k: "charges_fixes", label: "Charges fixes de structure (bilan)", val: "188 500 €", conf: 0.94 }
 ];
 
-export default function DocumentsView() {
+/* Étape 2 du dossier d'audit : dépôt des pièces, extraction et validation des champs.
+   onSuivant : passe au cockpit */
+export default function EtapeDocuments({ onSuivant }) {
   const [fichiers, setFichiers] = useState(FICHIERS_INITIAUX);
   const [champs, setChamps] = useState(CHAMPS_INITIAUX);
   const [masque, setMasque] = useState(true);
@@ -76,43 +75,39 @@ export default function DocumentsView() {
     ["Facture (recoupement)", fichiers.some(f => f.cat === "Facture")],
     ["Bilan comptable", fichiers.some(f => f.cat === "Bilan comptable")],
     ["Opt-in RGPD", true],
-    ["Questionnaire d'appoint", false]
+    ["Questionnaire d'appoint", true]
   ];
 
   return (
-    <PageShell
-      section="Audit · Module 2"
-      title="Analyse documentaire (OCR & IA)"
-      actions={
-        <>
-          <Badge tone="sky" dot>D-2026-041 · Bâti Duran SARL · BTP</Badge>
-          <Link className="btn btn-ghost btn-s" href="/cockpit">Aller au cockpit</Link>
-        </>
-      }
-    >
-      <div className="doc-cols">
-        <section className="col gap-l">
-          <DepotPieces fichiers={fichiers} onAjouter={ajouterFichier} onSupprimer={supprimerFichier} />
-          <PipelineExtraction
-            etat={pipeline}
-            moteur={moteur}
-            onMoteur={setMoteur}
-            onRelancer={lancerPipeline}
-          />
-          <AnomaliesDetectees />
-          <ExtractionPanel
-            champs={champs}
-            masque={masque}
-            onMasque={valeur => {
-              setMasque(valeur);
-              toast(valeur ? "Valeurs re-masquées." : "Démasquage via la table de correspondance locale.");
-            }}
-            onCorriger={corrigerChamp}
-          />
-        </section>
+    <div className="doc-cols">
+      <section className="col gap-l">
+        <DepotPieces fichiers={fichiers} onAjouter={ajouterFichier} onSupprimer={supprimerFichier} />
+        <PipelineExtraction
+          etat={pipeline}
+          moteur={moteur}
+          onMoteur={setMoteur}
+          onRelancer={lancerPipeline}
+        />
+        <AnomaliesDetectees />
+        <ExtractionPanel
+          champs={champs}
+          masque={masque}
+          onMasque={valeur => {
+            setMasque(valeur);
+            toast(valeur ? "Valeurs re-masquées." : "Démasquage via la table de correspondance locale.");
+          }}
+          onCorriger={corrigerChamp}
+        />
 
-        <DocumentsAside besoins={besoins} />
-      </div>
-    </PageShell>
+        <div className="row-between">
+          <span className="hint">Les champs validés alimentent le cockpit du dossier.</span>
+          <button className="btn" type="button" disabled={pipeline.encours} onClick={onSuivant}>
+            Passer au cockpit →
+          </button>
+        </div>
+      </section>
+
+      <DocumentsAside besoins={besoins} />
+    </div>
   );
 }

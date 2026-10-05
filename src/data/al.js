@@ -11,9 +11,7 @@ export const SECTEURS = ["BTP", "Services", "Industrie"];
 export const NAV = [
   { g: "Audit" },
   { id: "nouveau", href: "/nouveau-dossier", ico: "✦", label: "Nouvel audit" },
-  { id: "documents", href: "/documents", ico: "▤", label: "Analyse documentaire" },
-  { id: "cockpit", href: "/cockpit", ico: "◎", label: "Cockpit & résultats" },
-  { id: "rapports", href: "/rapports", ico: "▥", label: "Rapports" },
+  { id: "audits", href: "/audits", ico: "▤", label: "Audits" },
   { g: "Pilotage" },
   { id: "dashboard", href: "/dashboard", ico: "◧", label: "Tableau de bord" },
   { id: "clients", href: "/clients", ico: "◍", label: "Clients" },
@@ -33,7 +31,7 @@ export const IA_MAP = [
     ]
   },
   {
-    g: "Module 2 — Analyse documentaire", href: "/documents", items: [
+    g: "Module 2 — Analyse documentaire", href: "/audits", items: [
       ["Extraction documentaire", "Agent · RAG sur devis déjà traités", 0],
       ["Anonymisation RGPD", "Agent · regex + NER local (Presidio/spaCy)", 0],
       ["Auto-évaluation de la qualité d'extraction", "Agent · bornes min/max par secteur", 0],
@@ -43,7 +41,7 @@ export const IA_MAP = [
     ]
   },
   {
-    g: "Modules 3 & 4 — Cockpit", href: "/cockpit", items: [
+    g: "Modules 3 & 4 — Cockpit", href: "/audits", items: [
       ["Recommandation d'actions à 30 jours", "Agent · RAG sur playbooks consultants", 0],
       ["Score de risque de défaillance", "ML · Altman Z-score sur données publiques", 0],
       ["Score de santé organisationnelle appris", "ML · remplace la pondération manuelle", 2],
@@ -52,7 +50,7 @@ export const IA_MAP = [
     ]
   },
   {
-    g: "Rapport", href: "/rapports", items: [
+    g: "Rapport", href: "/audits", items: [
       ["Copilote de rédaction du rapport", "Agent · RAG sur la base métier Alumny", 0],
       ["Mise en page dynamique", "Agent · règles puis retour consultants", 2],
       ["Suivi post-audit & relance", "Agent · intégration CRM / Calendly", 2]
@@ -77,15 +75,16 @@ export const IA_MAP = [
   }
 ];
 
+/* etape : étape d'audit la plus avancée atteinte (1 onboarding → 4 rapport, cf. ETAPES_AUDIT) */
 export const DOSSIERS = [
-  { ref: "D-2026-041", client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "analysé", maj: "12/08/2026", consultant: "Tafita A.", score: 68, fuite: 47800 },
-  { ref: "D-2026-040", client: "Néo Conseil", siret: "903 118 220 00017", secteur: "Services", statut: "en cours d'analyse", maj: "12/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
-  { ref: "D-2026-039", client: "Métal Ouest", siret: "441 903 552 00038", secteur: "Industrie", statut: "documents en attente", maj: "11/08/2026", consultant: "Tafita A.", score: null, fuite: null },
-  { ref: "D-2026-038", client: "Toiture & Fils", siret: "789 220 114 00011", secteur: "BTP", statut: "rapport généré", maj: "09/08/2026", consultant: "Tafita A.", score: 54, fuite: 71200 },
-  { ref: "D-2026-037", client: "Studio Lompré", siret: "552 771 003 00029", secteur: "Services", statut: "rapport généré", maj: "05/08/2026", consultant: "Ny Aina R.", score: 81, fuite: 18400 },
-  { ref: "D-2026-036", client: "Charpente Vallée", siret: "331 887 664 00042", secteur: "BTP", statut: "brouillon", maj: "04/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
-  { ref: "D-2026-035", client: "Plasturgie Rhône", siret: "220 449 118 00050", secteur: "Industrie", statut: "archivé", maj: "22/07/2026", consultant: "Tafita A.", score: 62, fuite: 96500 },
-  { ref: "D-2026-034", client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "archivé", maj: "14/02/2026", consultant: "Ny Aina R.", score: 51, fuite: 63900 }
+  { ref: "D-2026-041", etape: 4, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "analysé", maj: "12/08/2026", consultant: "Tafita A.", score: 68, fuite: 47800 },
+  { ref: "D-2026-040", etape: 2, client: "Néo Conseil", siret: "903 118 220 00017", secteur: "Services", statut: "en cours d'analyse", maj: "12/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
+  { ref: "D-2026-039", etape: 2, client: "Métal Ouest", siret: "441 903 552 00038", secteur: "Industrie", statut: "documents en attente", maj: "11/08/2026", consultant: "Tafita A.", score: null, fuite: null },
+  { ref: "D-2026-038", etape: 4, client: "Toiture & Fils", siret: "789 220 114 00011", secteur: "BTP", statut: "rapport généré", maj: "09/08/2026", consultant: "Tafita A.", score: 54, fuite: 71200 },
+  { ref: "D-2026-037", etape: 4, client: "Studio Lompré", siret: "552 771 003 00029", secteur: "Services", statut: "rapport généré", maj: "05/08/2026", consultant: "Ny Aina R.", score: 81, fuite: 18400 },
+  { ref: "D-2026-036", etape: 1, client: "Charpente Vallée", siret: "331 887 664 00042", secteur: "BTP", statut: "brouillon", maj: "04/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
+  { ref: "D-2026-035", etape: 4, client: "Plasturgie Rhône", siret: "220 449 118 00050", secteur: "Industrie", statut: "archivé", maj: "22/07/2026", consultant: "Tafita A.", score: 62, fuite: 96500 },
+  { ref: "D-2026-034", etape: 4, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "archivé", maj: "14/02/2026", consultant: "Ny Aina R.", score: 51, fuite: 63900 }
 ];
 
 export const CLIENTS = [

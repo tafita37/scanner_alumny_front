@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import PageShell from "@/components/shell/PageShell";
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Note from "@/components/ui/Note";
@@ -34,7 +33,9 @@ const SYNTHESE_REFORMULEE = `Votre entreprise sous-facture sa main-d'œuvre : 42
   l'essentiel des 47 800 € de perte sèche annuelle estimée, sans investissement.
   <span class="ia-src">RAG sur la base métier Alumny · ton pédagogique</span>`;
 
-export default function RapportsView() {
+/* Étape 4 du dossier d'audit : composition, génération et historique du rapport PDF.
+   onGenere : appelé à chaque nouvelle version générée */
+export default function EtapeRapport({ onGenere }) {
   const [versions, setVersions] = useState(VERSIONS_INITIALES);
   const [generation, setGeneration] = useState({ encours: false, index: 0 });
   const [synthese, setSynthese] = useState(SYNTHESE_INITIALE);
@@ -55,6 +56,7 @@ export default function RapportsView() {
       timers.current.push(setTimeout(() => {
         if (i === ETAPES_GENERATION.length - 1) {
           setGeneration({ encours: false, index: ETAPES_GENERATION.length });
+          onGenere?.();
           setVersions(list => {
             const nom = "v" + (list.length + 1);
             toast(`Rapport <b>${nom}</b> généré — 11 pages, prêt à remettre.`, "ok");
@@ -127,16 +129,14 @@ export default function RapportsView() {
   );
 
   return (
-    <PageShell
-      section="Audit · Module 4"
-      title="Restitution & rapport PDF"
-      actions={
-        <>
-          <Badge tone="sky" dot>D-2026-041 · Bâti Duran SARL</Badge>
-          <button className="btn btn-gold" type="button" onClick={generer}>Générer une nouvelle version</button>
-        </>
-      }
-    >
+    <>
+      <div className="row-between mb">
+        <span className="hint">Chaque génération crée une nouvelle version : l&apos;historique est conservé.</span>
+        <button className="btn btn-gold" type="button" disabled={generation.encours} onClick={generer}>
+          Générer une nouvelle version
+        </button>
+      </div>
+
       <div className="rap-cols">
         <section className="col gap-l">
           <CompositionRapport />
@@ -213,6 +213,6 @@ export default function RapportsView() {
 
         <RapportsAside version={versions[0].v} />
       </div>
-    </PageShell>
+    </>
   );
 }

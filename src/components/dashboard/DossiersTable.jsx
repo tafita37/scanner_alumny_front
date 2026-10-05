@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { DOSSIERS, SECTEURS } from "@/data/al";
+import { SECTEURS } from "@/data/al";
+import { useDossiers } from "@/context/DossiersContext";
+import { lienDossier } from "@/lib/dossiers";
 import { fmtEur } from "@/lib/format";
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge, { StatusBadge } from "@/components/ui/Badge";
@@ -17,16 +19,17 @@ export default function DossiersTable() {
   const [statut, setStatut] = useState("tous");
   const [consultant, setConsultant] = useState("tous");
   const [q, setQ] = useState("");
+  const { dossiers } = useDossiers();
 
   const liste = useMemo(() => {
     const requete = q.toLowerCase().trim();
-    return DOSSIERS.filter(d =>
+    return dossiers.filter(d =>
       (secteur === "tous" || d.secteur === secteur) &&
       (statut === "tous" || d.statut === statut) &&
       (consultant === "tous" || d.consultant === consultant) &&
       (requete === "" || `${d.client} ${d.ref} ${d.siret}`.toLowerCase().includes(requete))
     );
-  }, [secteur, statut, consultant, q]);
+  }, [dossiers, secteur, statut, consultant, q]);
 
   return (
     <Card>
@@ -95,8 +98,7 @@ export default function DossiersTable() {
                 <td className="small faint nowrap">{d.maj}</td>
                 <td>
                   <div className="tbl-actions">
-                    <Link className="btn btn-icon" href="/cockpit" title="Cockpit">◎</Link>
-                    <Link className="btn btn-icon" href="/documents" title="Documents">▤</Link>
+                    <Link className="btn btn-icon" href={lienDossier(d.ref)} title="Ouvrir le dossier">→</Link>
                   </div>
                 </td>
               </tr>
@@ -106,7 +108,7 @@ export default function DossiersTable() {
       </TableWrap>
 
       <p className="hint mt-s">
-        {liste.length} dossier{liste.length > 1 ? "s" : ""} affiché{liste.length > 1 ? "s" : ""} sur {DOSSIERS.length}.
+        {liste.length} dossier{liste.length > 1 ? "s" : ""} affiché{liste.length > 1 ? "s" : ""} sur {dossiers.length}.
       </p>
     </Card>
   );

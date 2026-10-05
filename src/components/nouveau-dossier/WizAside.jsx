@@ -40,7 +40,7 @@ export default function WizAside({ dossier }) {
         </p> */}
       </Card>
 
-      <IaBlock>
+      {/* <IaBlock>
         <CardHead><h3>Scoring du lead</h3><IaPhase phase={2} /></CardHead>
         <div className="row-between" style={{ alignItems: "flex-end" }}>
           <div>
@@ -55,16 +55,7 @@ export default function WizAside({ dossier }) {
           heuristique manuelle au lancement, affinée par le modèle de conversion une fois l&apos;historique
           commercial constitué
         </IaSrc>
-      </IaBlock>
-
-      <Card flat>
-        <CardHead><h3>Ce qui est créé en base</h3></CardHead>
-        <ul className="entities">
-          {ENTITES.map(([nom, quoi]) => (
-            <li key={nom}><b>{nom}</b><span>{quoi}</span></li>
-          ))}
-        </ul>
-      </Card>
+      </IaBlock> */}
     </aside>
   );
 }
