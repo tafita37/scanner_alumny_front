@@ -22,6 +22,8 @@ export class ApiError extends Error {
 
 /* Extrait un message d'erreur des formats usuels de Django REST Framework :
    { detail }, { non_field_errors: [...] }, { email: [...] }, { error }… */
+const MESSAGE_INATTENDU = "Une erreur inattendue est survenue.";
+
 function messageErreur(data, status) {
   if (data && typeof data === "object") {
     if (typeof data.detail === "string") return data.detail;
@@ -31,11 +33,18 @@ function messageErreur(data, status) {
       if (Array.isArray(v) && typeof v[0] === "string") return v[0];
       if (typeof v === "string") return v;
     }
+    /* Erreurs imbriquées d'un serializer composé : { company: { city: [...] } } */
+    for (const v of Object.values(data)) {
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        const m = messageErreur(v, 0);
+        if (m !== MESSAGE_INATTENDU) return m;
+      }
+    }
   }
   if (status === 400 || status === 401) return "E-mail ou mot de passe incorrect.";
   if (status === 403) return "Accès refusé.";
   if (status >= 500) return "Le serveur a rencontré une erreur. Réessayez dans un instant.";
-  return "Une erreur inattendue est survenue.";
+  return MESSAGE_INATTENDU;
 }
 
 /* Requête HTTP brute, sans aucune gestion de session */
@@ -191,4 +200,13 @@ export function getInfosAudit(siret) {
 /* GET /api/companies/industries/ → [{ id, name, description }] */
 export function getSecteurs() {
   return apiFetch("/api/companies/industries/");
+}
+
+/* POST /api/companies/audits/create/ → crée l'audit (et l'entreprise / le dirigeant au besoin).
+   body : { company: { siren_number, company_name, naf_code, creation_date, industry, city, company_type },
+            ceo: { name, first_name, email, phone_number, job_title },
+            audit: { siret_number, head_count, revenue, profit, publication_year } }
+   → { id, siret_number, head_count, revenue, profit, publication_year, company_id, siren_number, company_name, … } */
+export function creerAudit(body) {
+  return apiFetch("/api/companies/audits/create/", { method: "POST", body });
 }

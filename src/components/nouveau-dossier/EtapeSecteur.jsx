@@ -9,6 +9,25 @@ import { useUi } from "@/context/UiContext";
 import { getSecteurs } from "@/lib/api";
 import { nomDirigeant } from "@/lib/format";
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/* Champs manquants ou invalides de l'étape : { champ: message } (vide si tout est bon).
+   Tout est obligatoire : le backend exige le dirigeant complet et le secteur d'une nouvelle entreprise. */
+export function erreursSecteur(dossier, contact) {
+  const e = {};
+  const vide = v => !v || !v.trim();
+  if (!dossier.secteurId) e.secteur = "Choisis le secteur d'activité.";
+  if (vide(contact.prenom)) e.prenom = "Prénom obligatoire.";
+  if (vide(contact.nom)) e.nom = "Nom obligatoire.";
+  if (vide(contact.mail)) e.mail = "E-mail obligatoire.";
+  else if (!EMAIL.test(contact.mail.trim())) e.mail = "E-mail invalide.";
+  else if (contact.mail.trim().length > 50) e.mail = "50 caractères au maximum.";
+  if (vide(contact.tel)) e.tel = "Téléphone obligatoire.";
+  if (vide(contact.fonction)) e.fonction = "Fonction obligatoire.";
+  else if (contact.fonction.trim().length > 50) e.fonction = "50 caractères au maximum.";
+  return e;
+}
+
 /* La liste ne change pas d'un dossier à l'autre : chargée une fois, gardée entre les allers-retours d'étapes. */
 let secteursEnCache = null;
 
@@ -18,6 +37,18 @@ export default function EtapeSecteur({ dossier, contact, onSecteur, onContact, o
   const [secteurs, setSecteurs] = useState(secteursEnCache);
   const [erreur, setErreur] = useState(null);
   const [essai, setEssai] = useState(0);
+  /* Les erreurs ne s'affichent qu'après une première tentative de passer à l'étape suivante. */
+  const [tente, setTente] = useState(false);
+  const erreurs = tente ? erreursSecteur(dossier, contact) : {};
+
+  const continuer = () => {
+    if (Object.keys(erreursSecteur(dossier, contact)).length) {
+      setTente(true);
+      toast("Complète les champs obligatoires avant de continuer.", "gold");
+      return;
+    }
+    onSuivant();
+  };
 
   useEffect(() => {
     if (secteursEnCache) return;
@@ -94,6 +125,7 @@ export default function EtapeSecteur({ dossier, contact, onSecteur, onContact, o
           ))}
         </div>
       )}
+      {erreurs.secteur && <p className="hint hint-err mt-s">{erreurs.secteur}</p>}
       <p className="hint mt-s">
         L&apos;agent orchestrateur multi-secteurs recroisera ce choix avec le contenu réel des devis déposés.
       </p>
@@ -111,23 +143,23 @@ export default function EtapeSecteur({ dossier, contact, onSecteur, onContact, o
       )}
 
       <div className="form-grid mt-s">
-        <Field label="Prénom du dirigeant">
+        <Field label="Prénom du dirigeant *" error={erreurs.prenom}>
           <input type="text" placeholder="Marc" value={contact.prenom}
             onChange={e => onContact("prenom", e.target.value)} />
         </Field>
-        <Field label="Nom du dirigeant">
+        <Field label="Nom du dirigeant *" error={erreurs.nom}>
           <input type="text" placeholder="Duran" value={contact.nom}
             onChange={e => onContact("nom", e.target.value)} />
         </Field>
-        <Field label="E-mail *">
+        <Field label="E-mail *" error={erreurs.mail}>
           <input type="email" placeholder="m.duran@batiduran.fr" value={contact.mail}
             onChange={e => onContact("mail", e.target.value)} />
         </Field>
-        <Field label="Téléphone *">
+        <Field label="Téléphone *" error={erreurs.tel}>
           <input type="text" placeholder="06 12 44 87 20" value={contact.tel}
             onChange={e => onContact("tel", e.target.value)} />
         </Field>
-        <Field label="Fonction" className="span-2">
+        <Field label="Fonction *" className="span-2" error={erreurs.fonction}>
           <input type="text" placeholder="Gérant" value={contact.fonction}
             onChange={e => onContact("fonction", e.target.value)} />
         </Field>
@@ -135,7 +167,7 @@ export default function EtapeSecteur({ dossier, contact, onSecteur, onContact, o
 
       <div className="row-between mt">
         <button className="btn btn-ghost" type="button" onClick={onPrecedent}>Retour</button>
-        <button className="btn" type="button" onClick={onSuivant}>Continuer</button>
+        <button className="btn" type="button" onClick={continuer}>Continuer</button>
       </div>
     </Card>
   );
