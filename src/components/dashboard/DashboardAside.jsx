@@ -8,9 +8,9 @@ import { IaBlock, IaSrc, IaTag, IaPhase } from "@/components/ui/Ia";
 import { Bar } from "@/components/ui/Misc";
 
 const A_TRAITER = [
-  { ico: "▤", client: "Métal Ouest", quoi: "Bilan comptable manquant — relance envoyée il y a 2 j", cta: ["Ouvrir", "/documents"] },
-  { ico: "⚠", client: "Néo Conseil", quoi: "2 champs extraits en faible confiance à valider", cta: ["Vérifier", "/documents"] },
-  { ico: "▥", client: "Bâti Duran SARL", quoi: "Résultats validés — rapport non généré", cta: ["Générer", "/rapports"] }
+  { ico: "▤", client: "Métal Ouest", quoi: "Bilan comptable manquant — relance envoyée il y a 2 j", cta: ["Ouvrir", "/audits/D-2026-039?etape=2"] },
+  { ico: "⚠", client: "Néo Conseil", quoi: "2 champs extraits en faible confiance à valider", cta: ["Vérifier", "/audits/D-2026-040?etape=2"] },
+  { ico: "▥", client: "Bâti Duran SARL", quoi: "Résultats validés — rapport non généré", cta: ["Générer", "/audits/D-2026-041?etape=4"] }
 ];
 
 const SIGNAUX = [

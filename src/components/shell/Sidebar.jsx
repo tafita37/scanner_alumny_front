@@ -37,7 +37,7 @@ export default function Sidebar({ onNavigate }) {
               key={item.id}
               href={item.href}
               title={item.label}
-              className={pathname === item.href ? "is-active" : undefined}
+              className={pathname === item.href || pathname.startsWith(item.href + "/") ? "is-active" : undefined}
               onClick={onNavigate}
             >
               <span className="nav-ico">{item.ico}</span>{item.label}

@@ -33,19 +33,35 @@ export function Table({ className = "", children, ...props }) {
 }
 
 /* Fil d'étapes de l'assistant d'onboarding.
-   etapes : [{ n, label }] · courante : numéro de l'étape active */
-export function Steps({ etapes, courante, className = "" }) {
+   etapes : [{ n, label }] · courante : numéro de l'étape active
+   atteinte : étape la plus avancée déjà atteinte (défaut : courante)
+   onAller : si fourni, les étapes déjà atteintes deviennent cliquables pour y revenir */
+export function Steps({ etapes, courante, atteinte = courante, onAller, className = "" }) {
   return (
     <div className={`steps ${className}`.trim()}>
-      {etapes.map((e, i) => (
-        <Fragment key={e.n}>
-          {i > 0 && <span className="step-sep" />}
-          <div className={"step" + (e.n === courante ? " is-on" : e.n < courante ? " is-done" : "")}>
-            <span className="step-n">{e.n < courante ? "✓" : e.n}</span>
+      {etapes.map((e, i) => {
+        const faite = e.n < atteinte && e.n !== courante;
+        const accessible = e.n <= atteinte && e.n !== courante;
+        const classes = "step" + (e.n === courante ? " is-on" : faite ? " is-done" : "");
+        const contenu = (
+          <>
+            <span className="step-n">{faite ? "✓" : e.n}</span>
             <span className="step-t">{e.label}</span>
-          </div>
-        </Fragment>
-      ))}
+          </>
+        );
+        return (
+          <Fragment key={e.n}>
+            {i > 0 && <span className="step-sep" />}
+            {accessible && onAller ? (
+              <button type="button" className={classes} onClick={() => onAller(e.n)} title={`Aller à l'étape ${e.n}`}>
+                {contenu}
+              </button>
+            ) : (
+              <div className={classes} aria-current={e.n === courante ? "step" : undefined}>{contenu}</div>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

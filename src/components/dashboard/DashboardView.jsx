@@ -36,7 +36,7 @@ export default function DashboardView() {
       title="Tableau de bord"
       actions={
         <>
-          <Link className="btn btn-ghost btn-s" href="/rapports">Derniers rapports</Link>
+          <Link className="btn btn-ghost btn-s" href="/audits">Audits en cours</Link>
           <Link className="btn" href="/nouveau-dossier">+ Nouvel audit</Link>
         </>
       }

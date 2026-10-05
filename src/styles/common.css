@@ -425,6 +425,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .step.is-on { border-color: var(--blue); background: var(--blue); box-shadow: var(--shadow-m); }
 .step.is-on .step-n { background: #fff; color: var(--blue); }
 .step.is-on .step-t { color: #fff; font-weight: bold; }
+button.step { font: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+button.step:hover { border-color: var(--blue); box-shadow: var(--shadow-m); }
+button.step:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .step-sep { width: 16px; height: 1px; background: var(--line-strong); }
 
 /* ---------- Divers composants ---------- */

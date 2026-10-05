@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import PageShell from "@/components/shell/PageShell";
 import Card, { CardHead } from "@/components/ui/Card";
 import Note from "@/components/ui/Note";
 import { IaSrc, IaTag } from "@/components/ui/Ia";
@@ -14,8 +12,10 @@ import { CONTROLES_COCKPIT, MOTEURS } from "@/data/moteurs";
 import { SECTEURS } from "@/data/al";
 import { useUi } from "@/context/UiContext";
 
-export default function CockpitView() {
-  const [secteur, setSecteur] = useState("BTP");
+/* Étape 3 du dossier d'audit : résultats calculés par le moteur sectoriel.
+   onSuivant : résultats validés → génération du rapport */
+export default function EtapeCockpit({ dossier, onSuivant }) {
+  const [secteur, setSecteur] = useState(SECTEURS.includes(dossier.secteur) ? dossier.secteur : "BTP");
   const [cle, setCle] = useState(0);            // force le rejeu des animations
   const [leviersEnCours, setLeviersEnCours] = useState(false);
   const timer = useRef(null);
@@ -53,17 +53,17 @@ export default function CockpitView() {
       </p>
       <ModalActions>
         <button className="btn btn-ghost" type="button" onClick={closeModal}>Revenir aux alertes</button>
-        <Link className="btn btn-gold" href="/rapports" onClick={closeModal}>Valider &amp; générer</Link>
+        <button className="btn btn-gold" type="button" onClick={() => { closeModal(); onSuivant(); }}>
+          Valider &amp; générer
+        </button>
       </ModalActions>
     </>
   );
 
   return (
-    <PageShell
-      section="Audit · Modules 3 & 4"
-      title="Cockpit consultant"
-      actions={
-        <>
+    <>
+      <div className="row-between mb">
+        <div className="row gap-s">
           <select
             className="select-auto" value={secteur} aria-label="Moteur sectoriel"
             onChange={e => changerSecteur(e.target.value)}
@@ -71,10 +71,10 @@ export default function CockpitView() {
             {SECTEURS.map(s => <option key={s}>{s}</option>)}
           </select>
           <button className="btn btn-ghost btn-s" type="button" onClick={recalculer}>↻ Recalculer</button>
-          <Link className="btn btn-gold" href="/rapports">Générer le rapport</Link>
-        </>
-      }
-    >
+        </div>
+        <button className="btn btn-gold" type="button" onClick={validerResultats}>Générer le rapport</button>
+      </div>
+
       <Note tone="gold" ico="👁" className="mb">
         <b>Vue interne.</b> Ce cockpit n&apos;est jamais montré au client : il ne reçoit que le rapport PDF
         généré à partir de ces résultats.
@@ -131,6 +131,6 @@ export default function CockpitView() {
           <button className="btn mt" type="button" onClick={validerResultats}>Valider les résultats</button>
         </Card>
       </section>
-    </PageShell>
+    </>
   );
 }

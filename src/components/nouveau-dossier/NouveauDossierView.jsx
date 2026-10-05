@@ -13,8 +13,11 @@ import EtapeConsentement from "@/components/nouveau-dossier/EtapeConsentement";
 import EtapeQuestionnaire from "@/components/nouveau-dossier/EtapeQuestionnaire";
 import WizAside from "@/components/nouveau-dossier/WizAside";
 import { useUi } from "@/context/UiContext";
+import { useUser } from "@/context/UserContext";
+import { useDossiers } from "@/context/DossiersContext";
 import { creerAudit, getInfosAudit } from "@/lib/api";
 import { enNombre, groupe, heureCourante } from "@/lib/format";
+import { dateDuJour, lienDossier } from "@/lib/dossiers";
 
 const QUESTIONNAIRE_VIDE = { ca: "", effectif: "", benefices: "", siret: "", annee: "" };
 const fmtNombre = n => (n === null || n === undefined ? "" : groupe(n));
@@ -74,6 +77,8 @@ const ETAPES = [
 export default function NouveauDossierView() {
   const router = useRouter();
   const { toast, openModal, closeModal } = useUi();
+  const { user } = useUser();
+  const { ajouterDossier } = useDossiers();
 
   const [etape, setEtape] = useState(1);
   const [dossier, setDossier] = useState({
@@ -177,12 +182,37 @@ export default function NouveauDossierView() {
 
   const [envoi, setEnvoi] = useState(false);
 
+  /* Enchaîner tout de suite sur l'analyse documentaire, ou reprendre plus tard depuis la liste. */
+  const proposerSuite = (ref, entreprise) => openModal(
+    <>
+      <h2>Dossier {ref} créé</h2>
+      <p>
+        L&apos;onboarding de <b>{entreprise}</b> est enregistré. Tu peux passer directement à l&apos;analyse
+        documentaire, ou la reprendre plus tard depuis la liste des <b>audits en cours</b>.
+      </p>
+      <ModalActions>
+        <button className="btn btn-ghost" type="button" onClick={() => { closeModal(); router.push("/audits"); }}>
+          Plus tard
+        </button>
+        <button className="btn" type="button" onClick={() => { closeModal(); router.push(lienDossier(ref, 2)); }}>
+          Continuer vers l&apos;analyse documentaire
+        </button>
+      </ModalActions>
+    </>
+  );
+
   const creer = async () => {
     setEnvoi(true);
     try {
       const cree = await creerAudit(corpsAudit(dossier, contact, questionnaire));
-      toast(`Dossier <b>#${cree.id}</b> créé pour ${cree.company_name} — statut : documents en attente.`, "ok");
-      setTimeout(() => router.push("/documents"), 900);
+      const ref = `A-${cree.id}`;
+      /* L'onboarding est terminé : le dossier attend ses documents (étape 2). */
+      ajouterDossier({
+        ref, etape: 2, client: cree.company_name, siret: cree.siret_number, secteur: dossier.secteur,
+        statut: "documents en attente", maj: dateDuJour(), consultant: user.nom, score: null, fuite: null,
+        contact: [contact.prenom, contact.nom].join(" ").trim() || contact.mail.trim() || null
+      });
+      proposerSuite(ref, cree.company_name);
     } catch (err) {
       toast(err.message, "gold");
       setEnvoi(false);
@@ -200,7 +230,7 @@ export default function NouveauDossierView() {
         </>
       }
     >
-      <Steps etapes={ETAPES} courante={etape} className="mb" />
+      <Steps etapes={ETAPES} courante={etape} onAller={aller} className="mb" />
 
       <div className="wiz">
         <div className="wiz-main">

@@ -32,7 +32,7 @@ export const COPI_ACTIONS = [
     quoi: "D-2026-041 · Bâti Duran SARL",
     etapes: ["Collecte des résultats validés", "Rédaction de la synthèse dirigeant", "Sélection des 3 leviers à 30 jours", "Mise en page à la charte", "Export PDF versionné"],
     fait: "Rapport <b>v4</b> généré — 11 pages, non remis au client tant que tu ne l'as pas relu.",
-    lien: ["Ouvrir le rapport", "/rapports"],
+    lien: ["Ouvrir le rapport", "/audits/D-2026-041?etape=4"],
     motifs: /rapport|pdf|génère|genere|générer/
   },
   {
@@ -40,7 +40,7 @@ export const COPI_ACTIONS = [
     quoi: "Métal Ouest · bilan comptable absent",
     etapes: ["Identification des pièces manquantes", "Rédaction du message au dirigeant", "Préparation de l'envoi"],
     fait: "Message prêt à envoyer — il part uniquement après ta relecture.",
-    lien: ["Voir le dossier", "/documents"],
+    lien: ["Voir le dossier", "/audits/D-2026-039?etape=2"],
     motifs: /relanc|mail|e-mail|pièce|piece|manquant/
   },
   {
@@ -56,7 +56,7 @@ export const COPI_ACTIONS = [
     quoi: "Reprend les champs corrigés et propage en cascade",
     etapes: ["Relecture des champs extraits", "Exécution du moteur BTP", "Mise à jour du score et des leviers"],
     fait: "Score recalculé : <b>68 → 71</b> · perte sèche estimée 47 800 € → 44 200 €.",
-    lien: ["Voir le cockpit", "/cockpit"],
+    lien: ["Voir le cockpit", "/audits/D-2026-041?etape=3"],
     motifs: /recalcul|calcul|score|corrig/
   },
   {
