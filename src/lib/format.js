@@ -31,3 +31,9 @@ export function heureCourante(avecSecondes = true) {
 /* Dirigeant renvoyé par l'annuaire des entreprises : « PAUL VERDIN », ou null */
 export const nomDirigeant = entreprise =>
   [entreprise?.ceo_first_name, entreprise?.ceo_name].filter(Boolean).join(" ") || null;
+
+/* « 1 234 € », « − 5 000 » → nombre ; null si vide, NaN si illisible */
+export function enNombre(valeur) {
+  const s = String(valeur ?? "").replace(/[\s €]/g, "").replace(/−/g, "-").replace(",", ".");
+  return s === "" ? null : Number(s);
+}

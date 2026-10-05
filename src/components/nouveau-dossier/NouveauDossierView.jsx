@@ -13,11 +13,56 @@ import EtapeConsentement from "@/components/nouveau-dossier/EtapeConsentement";
 import EtapeQuestionnaire from "@/components/nouveau-dossier/EtapeQuestionnaire";
 import WizAside from "@/components/nouveau-dossier/WizAside";
 import { useUi } from "@/context/UiContext";
-import { getInfosAudit } from "@/lib/api";
-import { groupe, heureCourante } from "@/lib/format";
+import { creerAudit, getInfosAudit } from "@/lib/api";
+import { enNombre, groupe, heureCourante } from "@/lib/format";
 
-const QUESTIONNAIRE_VIDE = { ca: "", effectif: "", benefices: "" };
+const QUESTIONNAIRE_VIDE = { ca: "", effectif: "", benefices: "", siret: "", annee: "" };
 const fmtNombre = n => (n === null || n === undefined ? "" : groupe(n));
+
+/* Questionnaire pré-rempli avec les comptes publiés ; à défaut, SIREN (à compléter par le NIC)
+   et dernière année close. */
+const questionnaireDepuis = (infos, siren) => ({
+  ca: fmtNombre(infos?.revenue),
+  effectif: fmtNombre(infos?.head_count),
+  benefices: fmtNombre(infos?.profit),
+  siret: infos?.siret_number || siren || "",
+  annee: String(infos?.publication_year ?? new Date().getFullYear() - 1)
+});
+
+/* Retire les champs vides : le backend refuse null sur les champs facultatifs de l'entreprise. */
+const sansVides = objet => Object.fromEntries(
+  Object.entries(objet).filter(([, v]) => v !== null && v !== undefined && v !== "")
+);
+
+/* Body de POST /api/companies/audits/create/ */
+const corpsAudit = (dossier, contact, q) => {
+  const e = dossier.entreprise;
+  return {
+    company: sansVides({
+      siren_number: e.siren_number,
+      company_name: e.company_name,
+      naf_code: e.naf_code,
+      creation_date: e.creation_date,
+      industry: dossier.secteurId,
+      city: e.city_code_insee,
+      company_type: e.company_type_label
+    }),
+    ceo: {
+      name: contact.nom.trim(),
+      first_name: contact.prenom.trim(),
+      email: contact.mail.trim(),
+      phone_number: contact.tel.trim(),
+      job_title: contact.fonction.trim()
+    },
+    audit: {
+      siret_number: q.siret.replace(/\s+/g, ""),
+      head_count: enNombre(q.effectif),
+      revenue: enNombre(q.ca),
+      profit: enNombre(q.benefices),
+      publication_year: enNombre(q.annee)
+    }
+  };
+};
 
 const ETAPES = [
   { n: 1, label: "Entreprise" },
@@ -80,14 +125,10 @@ export default function NouveauDossierView() {
       const infos = await getInfosAudit(siret);
       if (id !== dernierAudit.current) return;
       setAudit(infos);
-      setQuestionnaire(infos ? {
-        ca: fmtNombre(infos.revenue),
-        effectif: fmtNombre(infos.head_count),
-        benefices: fmtNombre(infos.profit)
-      } : QUESTIONNAIRE_VIDE);
+      setQuestionnaire(questionnaireDepuis(infos, siret));
     } catch (err) {
       if (id !== dernierAudit.current) return;
-      setQuestionnaire(QUESTIONNAIRE_VIDE);
+      setQuestionnaire(questionnaireDepuis(null, siret));
       toast(err.message, "gold");
     } finally {
       if (id === dernierAudit.current) setChargementAudit(false);
@@ -134,9 +175,18 @@ export default function NouveauDossierView() {
     </>
   );
 
-  const creer = () => {
-    toast("Dossier <b>D-2026-042</b> créé — statut : documents en attente.", "ok");
-    setTimeout(() => router.push("/documents"), 900);
+  const [envoi, setEnvoi] = useState(false);
+
+  const creer = async () => {
+    setEnvoi(true);
+    try {
+      const cree = await creerAudit(corpsAudit(dossier, contact, questionnaire));
+      toast(`Dossier <b>#${cree.id}</b> créé pour ${cree.company_name} — statut : documents en attente.`, "ok");
+      setTimeout(() => router.push("/documents"), 900);
+    } catch (err) {
+      toast(err.message, "gold");
+      setEnvoi(false);
+    }
   };
 
   return (
@@ -191,7 +241,9 @@ export default function NouveauDossierView() {
             <EtapeQuestionnaire
               badge={badgeQuestionnaire}
               audit={audit}
+              siren={dossier.siret}
               chargement={chargementAudit}
+              envoi={envoi}
               valeurs={questionnaire}
               onChange={surQuestionnaire}
               onPrecedent={() => aller(3)}

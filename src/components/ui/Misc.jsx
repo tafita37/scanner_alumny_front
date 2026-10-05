@@ -66,13 +66,14 @@ export function Switch({ checked, onChange, disabled = false, "aria-label": aria
   );
 }
 
-/* Champ de formulaire : label + contrôle + indication éventuelle. */
-export function Field({ label, hint, hintClassName = "hint", htmlFor, className = "", children }) {
+/* Champ de formulaire : label + contrôle + indication éventuelle.
+   error : message d'erreur affiché à la place de l'indication. */
+export function Field({ label, hint, hintClassName = "hint", error, htmlFor, className = "", children }) {
   return (
-    <div className={`field ${className}`.trim()}>
+    <div className={`field ${error ? "is-err " : ""}${className}`.trim()}>
       {label && <label htmlFor={htmlFor}>{label}</label>}
       {children}
-      {hint && <span className={hintClassName}>{hint}</span>}
+      {error ? <span className="hint hint-err">{error}</span> : hint && <span className={hintClassName}>{hint}</span>}
     </div>
   );
 }

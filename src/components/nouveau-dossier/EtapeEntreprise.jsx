@@ -186,7 +186,7 @@ export default function EtapeEntreprise({ dossier, onChoisir, onSuivant, onSansD
             <button className="btn btn-ghost btn-s" type="button" onClick={onSansDonnees}>
               Aucune donnée publique disponible ?
             </button>
-            <button className="btn" type="button" onClick={onSuivant}>Continuer</button>
+            <button className="btn" type="button" onClick={onSuivant} disabled={rafraichissement}>Continuer</button>
           </div>
         </div>
       )}
