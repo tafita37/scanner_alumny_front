@@ -3,31 +3,31 @@
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
-import { Divider, Spinner } from "@/components/ui/Misc";
+import { Bar, Divider, Spinner } from "@/components/ui/Misc";
 import { useUi } from "@/context/UiContext";
-
-export const ETAPES_PIPELINE = [
-  { k: "natif", n: 1, titre: "Extraction native du texte", desc: "rapide, gratuite — si le PDF contient une vraie couche de texte", msg: "texte natif détecté", duree: 700 },
-  { k: "ocr", n: 2, titre: "Bascule OCR / Vision LLM", desc: "Qwen 2.5 VL 7B en local via Ollama — image → JSON en un appel", msg: "non nécessaire", duree: 500 },
-  { k: "anon", n: 3, titre: "Anonymisation locale", desc: "regex (e-mail, téléphone) + NER Presidio/spaCy (nom, adresse)", msg: "4 entités masquées", duree: 900 },
-  { k: "llm", n: 4, titre: "Extraction structurée JSON strict", desc: null, msg: "12 champs · schéma valide", duree: 1100 },
-  { k: "check", n: 5, titre: "Auto-évaluation qualité", desc: "bornes min/max par secteur — re-extraction ou alerte humaine", msg: "1 champ sous le seuil", duree: 800 }
-];
+import { ETAPES_PIPELINE } from "@/lib/extractionSimulee";
 
 const HINTS = {
   local: "Auto-hébergé, ~8-12 Go de VRAM. Aucune donnée ne quitte l'infrastructure Alumny ; fiabilité légèrement inférieure sur les documents très dégradés.",
   externe: "Meilleure qualité sur écriture manuscrite et photos dégradées, mais l'image brute part chez un tiers : exige une anonymisation en amont ou un DPA / Zero Data Retention."
 };
 
-/* etat : { encours: bool, index: number } — index = étape en cours d'exécution */
-export default function PipelineExtraction({ etat, moteur, onMoteur, onRelancer }) {
-  const { toast } = useUi();
+const CLASSES = { run: "is-run", ok: "is-ok", skip: "is-skip", warn: "is-warn", err: "is-err" };
 
-  const classe = i => {
-    if (etat.encours && i === etat.index) return "is-run";
-    if (etat.encours && i > etat.index) return "";
-    return ETAPES_PIPELINE[i].msg === "non nécessaire" ? "is-skip" : "is-ok";
-  };
+function badgeEtat(doc, enFile) {
+  if (!doc) return <Badge tone="ink">en attente de documents</Badge>;
+  if (doc.statut === "upload") return <Badge tone="sky">téléversement</Badge>;
+  if (doc.statut === "analyse") return <Badge tone="warn">en cours</Badge>;
+  if (doc.statut === "attente") return <Badge tone="ink">en file</Badge>;
+  if (doc.statut === "erreur") return <Badge tone="bad">échec</Badge>;
+  return <Badge tone="ok">{enFile ? `terminé · ${enFile} en file` : "terminé"}</Badge>;
+}
+
+/* doc : document suivi (celui en cours de traitement, sinon celui sélectionné)
+   journal : [{ id, heure, texte, ton }] du plus récent au plus ancien */
+export default function PipelineExtraction({ doc, enFile, journal, moteur, onMoteur, onRelancer }) {
+  const { toast } = useUi();
+  const occupe = doc && (doc.statut === "upload" || doc.statut === "analyse" || doc.statut === "attente");
 
   const choisirMoteur = m => {
     onMoteur(m);
@@ -38,29 +38,61 @@ export default function PipelineExtraction({ etat, moteur, onMoteur, onRelancer 
     <Card>
       <CardHead>
         <h2>Pipeline d&apos;extraction</h2>
-        <Badge tone={etat.encours ? "warn" : "ok"}>{etat.encours ? "en cours" : "terminé"}</Badge>
+        {badgeEtat(doc, enFile)}
       </CardHead>
 
-      <ol className="pipe">
-        {ETAPES_PIPELINE.map((e, i) => (
-          <li key={e.k} className={classe(i)}>
-            <span className="pipe-n">{e.n}</span>
-            <div>
-              <b>{e.titre}</b>
-              <span>
-                {e.k === "llm"
-                  ? <>schéma imposé, <code>null</code> plutôt qu&apos;une valeur hallucinée</>
-                  : e.desc}
-              </span>
-            </div>
-            <span className="pipe-s">
-              {etat.encours && i === etat.index
-                ? <Spinner style={{ display: "inline-block", verticalAlign: -2 }} />
-                : etat.encours && i > etat.index ? "" : e.msg}
+      {doc ? (
+        <div className="pipe-doc">
+          <span className="file-ico">{doc.type}</span>
+          <span className="grow">
+            <b>{doc.nom}</b>
+            <span className="file-meta">
+              {doc.statut === "upload"
+                ? `envoi du fichier — ${doc.progression} %`
+                : `${doc.cat || "catégorie à déterminer"} · ${doc.taille}`}
             </span>
-          </li>
-        ))}
+            {doc.statut === "upload" && <Bar value={doc.progression} tint="sky" className="file-bar" />}
+          </span>
+        </div>
+      ) : (
+        <p className="hint mb">Dépose une pièce pour suivre son traitement étape par étape.</p>
+      )}
+
+      <ol className="pipe">
+        {ETAPES_PIPELINE.map((e, i) => {
+          const s = doc?.etapes[i] || { statut: "attente", msg: "" };
+          return (
+            <li key={e.k} className={CLASSES[s.statut] || ""}>
+              <span className="pipe-n">{s.statut === "ok" ? "✓" : s.statut === "err" ? "✕" : e.n}</span>
+              <div>
+                <b>{e.titre}</b>
+                <span>
+                  {e.k === "llm"
+                    ? <>schéma imposé, <code>null</code> plutôt qu&apos;une valeur hallucinée</>
+                    : e.desc}
+                </span>
+              </div>
+              <span className="pipe-s">
+                {s.statut === "run" && <Spinner style={{ display: "inline-block", verticalAlign: -2, marginRight: 6 }} />}
+                {s.msg}
+              </span>
+            </li>
+          );
+        })}
       </ol>
+
+      {journal.length > 0 && (
+        <>
+          <div className="mt"><span className="lbl">Journal de traitement</span></div>
+          <ul className="journal mt-s">
+            {journal.map(l => (
+              <li key={l.id} className={l.ton ? `j-${l.ton}` : undefined}>
+                <span className="mono">{l.heure}</span>{l.texte}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <Divider />
 
@@ -72,7 +104,9 @@ export default function PipelineExtraction({ etat, moteur, onMoteur, onRelancer 
             <Chip active={moteur === "externe"} onClick={() => choisirMoteur("externe")}>API externe (qualité +)</Chip>
           </div>
         </div>
-        <button className="btn btn-ghost btn-s" type="button" onClick={onRelancer}>Relancer le pipeline</button>
+        <button className="btn btn-ghost btn-s" type="button" disabled={!doc || occupe} onClick={() => onRelancer(doc.id)}>
+          Relancer le pipeline
+        </button>
       </div>
 
       <p className="hint mt-s">{HINTS[moteur]}</p>

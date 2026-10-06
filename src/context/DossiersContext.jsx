@@ -7,19 +7,6 @@ import { dateDuJour, dossierDepuisApi } from "@/lib/dossiers";
 
 const DossiersContext = createContext(null);
 
-/* Les audits viennent de GET /api/companies/audits/.
-   Le backend ne permet pas encore de faire avancer un audit (remaining_step) : l'avancement fait
-   dans l'outil est gardé dans le navigateur et appliqué par-dessus la réponse de l'API. */
-const CLE_STOCKAGE = "alumny.dossiers.avancement";
-
-function lireAvancement() {
-  try {
-    const brut = JSON.parse(localStorage.getItem(CLE_STOCKAGE));
-    if (brut && typeof brut === "object" && !Array.isArray(brut)) return brut;
-  } catch { /* stockage indisponible ou illisible */ }
-  return {};
-}
-
 export function DossiersProvider({ children }) {
   const { token } = useUser();
   const [audits, setAudits] = useState([]);
@@ -27,20 +14,8 @@ export function DossiersProvider({ children }) {
   /* charge : une première réponse (ou erreur) est arrivée pour la session courante */
   const [charge, setCharge] = useState(false);
   const [erreur, setErreur] = useState(null);
-  const [avancementLu, setAvancementLu] = useState(false);
   /* Numéro du dernier chargement : une réponse dépassée est ignorée. */
   const dernier = useRef(0);
-
-  /* Lecture du stockage après le premier rendu : pas de décalage d'hydratation. */
-  useEffect(() => {
-    setAvancement(lireAvancement());
-    setAvancementLu(true);
-  }, []);
-
-  useEffect(() => {
-    if (!avancementLu) return;
-    try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(avancement)); } catch { /* stockage indisponible */ }
-  }, [avancement, avancementLu]);
 
   const recharger = useCallback(async () => {
     const id = ++dernier.current;
