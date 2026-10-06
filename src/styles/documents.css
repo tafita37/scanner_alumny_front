@@ -1,9 +1,9 @@
 /* Page Analyse documentaire (Module 2) */
 
 .doc-cols {
-  display: grid;
+  /* display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
-  gap: 22px;
+  gap: 22px; */
   align-items: start;
 }
 @media (max-width: 1240px) { .doc-cols { grid-template-columns: 1fr; } }
@@ -19,6 +19,8 @@
   transition: border-color .18s, background .18s;
 }
 .drop.is-over { border-color: var(--blue); background: var(--blue-soft); }
+.drop { cursor: pointer; }
+.drop:hover, .drop:focus-visible { border-color: var(--blue-2); outline: none; }
 .drop-ico {
   width: 48px; height: 48px; border-radius: 15px;
   background: var(--pale); color: var(--blue-dark);
@@ -41,7 +43,21 @@
   display: grid; place-items: center; font-size: 10px; font-weight: bold;
   border: 1px solid #cfe3e8;
 }
+.files li { cursor: pointer; transition: border-color .18s, background .18s; }
+.files li:hover { border-color: var(--line-strong); }
+.files li.is-sel { border-color: #cddcfa; background: var(--blue-soft); }
+.files li.is-err { border-color: #eccfce; background: var(--bad-bg); }
+.files .badge { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.file-bar { height: 5px; margin-top: 6px; }
+.file-bar > i { transition: width .25s ease; }
+.spin-xs { width: 10px; height: 10px; border-width: 2px; }
+.txt-bad { color: var(--bad); }
 .file-nom { font-weight: bold; font-size: 13.5px; color: var(--ink); }
+
+/* Aperçu du fichier original */
+.apercu { height: 420px; border: 1px solid var(--line); border-radius: var(--r-m); overflow: hidden; background: #f7f9fd; }
+.apercu iframe { width: 100%; height: 100%; border: 0; }
+.apercu img { width: 100%; height: 100%; object-fit: contain; }
 .file-meta { font-size: 11.5px; color: var(--ink-faint); }
 
 /* Pipeline */
@@ -66,6 +82,33 @@
 .pipe li.is-ok .pipe-n { background: var(--ok-bg); color: var(--ok); }
 .pipe li.is-ok .pipe-s { color: var(--ok); }
 .pipe li.is-skip { opacity: .55; }
+.pipe li.is-warn .pipe-n { background: var(--warn-bg); color: var(--warn); }
+.pipe li.is-warn .pipe-s { color: var(--warn); }
+.pipe li.is-err { background: var(--bad-bg); border-color: #eccfce; }
+.pipe li.is-err .pipe-n { background: var(--bad); color: #fff; }
+.pipe li.is-err .pipe-s { color: var(--bad); }
+.pipe li.is-run .pipe-s { color: var(--blue); }
+
+/* Document suivi par le pipeline */
+.pipe-doc { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.pipe-doc b { display: block; font-size: 13.5px; color: var(--ink); }
+
+/* Journal horodaté */
+.journal {
+  list-style: none; margin: 0; padding: 10px 12px;
+  max-height: 168px; overflow: auto;
+  background: #f7f9fd; border: 1px solid var(--line); border-radius: var(--r-m);
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; color: var(--ink-soft);
+}
+.journal li { display: flex; gap: 10px; animation: rise .25s ease both; }
+.journal .mono { color: var(--ink-faint); font-size: 11px; flex: none; padding-top: 1px; }
+.journal .j-ok { color: var(--ok); }
+.journal .j-gold { color: #96682a; }
+.journal .j-bad { color: var(--bad); }
+
+.select-s { padding: 5px 10px; font-size: 12.5px; max-width: 220px; }
+.toast-bad { background: var(--bad); }
 code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #eef2f9; padding: 1px 5px; border-radius: 4px; }
 
 /* JSON & extraction */
@@ -109,6 +152,8 @@ tr.low:hover { background: #f8e9d2; }
 }
 .anos b { display: block; color: var(--blue); }
 .anos .sig { font-size: 11.5px; color: var(--ink-soft); }
+.anos li.is-ecarte { opacity: .55; }
+.anos li.is-confirme { border-color: #eccfce; }
 .ano-sc {
   width: 42px; flex: none; text-align: center;
   font-family: var(--font-title); font-weight: 700; font-size: 17px; color: var(--gold);
@@ -131,5 +176,7 @@ tr.low:hover { background: #f8e9d2; }
   .pipe li { flex-wrap: wrap; }
   .json { font-size: 11.5px; padding: 12px; }
   .anos li { flex-wrap: wrap; }
-  .ano-sc { width: auto; text-align: left; }
+  .anos li.is-ecarte { opacity: .55; }
+.anos li.is-confirme { border-color: #eccfce; }
+.ano-sc { width: auto; text-align: left; }
 }
