@@ -1,60 +1,89 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { DOSSIERS } from "@/data/al";
-import { dateDuJour } from "@/lib/dossiers";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useUser } from "@/context/UserContext";
+import { listerAudits } from "@/lib/api";
+import { dateDuJour, dossierDepuisApi } from "@/lib/dossiers";
 
 const DossiersContext = createContext(null);
 
-/* Le backend ne liste pas encore les audits : la liste part des dossiers de démonstration (al.js),
-   complétée par les dossiers créés dans l'onboarding et l'avancement fait dans l'outil.
-   Seuls ces ajouts et modifications sont conservés dans le navigateur. */
-const CLE_STOCKAGE = "alumny.dossiers";
-const ETAT_VIDE = { crees: [], patchs: {} };
+/* Les audits viennent de GET /api/companies/audits/.
+   Le backend ne permet pas encore de faire avancer un audit (remaining_step) : l'avancement fait
+   dans l'outil est gardé dans le navigateur et appliqué par-dessus la réponse de l'API. */
+const CLE_STOCKAGE = "alumny.dossiers.avancement";
 
-function lireStockage() {
+function lireAvancement() {
   try {
     const brut = JSON.parse(localStorage.getItem(CLE_STOCKAGE));
-    if (brut && Array.isArray(brut.crees) && brut.patchs && typeof brut.patchs === "object") return brut;
+    if (brut && typeof brut === "object" && !Array.isArray(brut)) return brut;
   } catch { /* stockage indisponible ou illisible */ }
-  return ETAT_VIDE;
+  return {};
 }
 
 export function DossiersProvider({ children }) {
-  const [etat, setEtat] = useState(ETAT_VIDE);
-  /* Lecture du stockage après le premier rendu : pas de décalage d'hydratation. */
+  const { token } = useUser();
+  const [audits, setAudits] = useState([]);
+  const [avancement, setAvancement] = useState({});
+  /* charge : une première réponse (ou erreur) est arrivée pour la session courante */
   const [charge, setCharge] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const [avancementLu, setAvancementLu] = useState(false);
+  /* Numéro du dernier chargement : une réponse dépassée est ignorée. */
+  const dernier = useRef(0);
 
+  /* Lecture du stockage après le premier rendu : pas de décalage d'hydratation. */
   useEffect(() => {
-    setEtat(lireStockage());
-    setCharge(true);
+    setAvancement(lireAvancement());
+    setAvancementLu(true);
   }, []);
 
   useEffect(() => {
-    if (!charge) return;
-    try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(etat)); } catch { /* stockage indisponible */ }
-  }, [etat, charge]);
+    if (!avancementLu) return;
+    try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(avancement)); } catch { /* stockage indisponible */ }
+  }, [avancement, avancementLu]);
 
-  const dossiers = useMemo(
-    () => [...etat.crees, ...DOSSIERS].map(d => ({ ...d, ...etat.patchs[d.ref] })),
-    [etat]
-  );
-
-  const ajouterDossier = useCallback(dossier => {
-    setEtat(e => ({ ...e, crees: [dossier, ...e.crees.filter(d => d.ref !== dossier.ref)] }));
+  const recharger = useCallback(async () => {
+    const id = ++dernier.current;
+    try {
+      const liste = await listerAudits();
+      if (id !== dernier.current) return;
+      setAudits(Array.isArray(liste) ? liste : []);
+      setErreur(null);
+    } catch (err) {
+      if (id !== dernier.current) return;
+      setErreur(err.message);
+    } finally {
+      if (id === dernier.current) setCharge(true);
+    }
   }, []);
 
-  /* Modifie un dossier (étape atteinte, statut…) et date sa mise à jour. */
+  /* Chargement à l'ouverture de session ; tout est vidé à la déconnexion. */
+  useEffect(() => {
+    if (token) {
+      recharger();
+      return;
+    }
+    dernier.current++;
+    setAudits([]);
+    setErreur(null);
+    setCharge(false);
+  }, [token, recharger]);
+
+  const dossiers = useMemo(() => audits.map(a => {
+    const d = dossierDepuisApi(a);
+    const local = avancement[d.ref];
+    if (!local) return d;
+    return { ...d, ...local, etape: Math.max(d.etape, local.etape ?? 0) };
+  }), [audits, avancement]);
+
+  /* Fait avancer un dossier (étape atteinte, statut…) et date sa mise à jour. */
   const majDossier = useCallback((ref, patch) => {
-    setEtat(e => ({
-      ...e,
-      patchs: { ...e.patchs, [ref]: { ...e.patchs[ref], ...patch, maj: dateDuJour() } }
-    }));
+    setAvancement(a => ({ ...a, [ref]: { ...a[ref], ...patch, maj: dateDuJour() } }));
   }, []);
 
   const valeur = useMemo(
-    () => ({ dossiers, charge, ajouterDossier, majDossier }),
-    [dossiers, charge, ajouterDossier, majDossier]
+    () => ({ dossiers, charge, erreur, recharger, majDossier }),
+    [dossiers, charge, erreur, recharger, majDossier]
   );
 
   return <DossiersContext.Provider value={valeur}>{children}</DossiersContext.Provider>;

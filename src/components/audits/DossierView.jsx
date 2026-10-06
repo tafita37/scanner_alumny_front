@@ -17,7 +17,7 @@ import { ETAPES_AUDIT, lienDossier } from "@/lib/dossiers";
    On peut revenir sur toute étape déjà atteinte, jamais sauter au-delà. */
 export default function DossierView({ refDossier, etapeDemandee }) {
   const router = useRouter();
-  const { dossiers, charge, majDossier } = useDossiers();
+  const { dossiers, charge, erreur, recharger, majDossier } = useDossiers();
   const dossier = dossiers.find(d => d.ref === refDossier);
   const [choisie, setChoisie] = useState(null);
 
@@ -30,12 +30,17 @@ export default function DossierView({ refDossier, etapeDemandee }) {
 
   if (!dossier) {
     return (
-      <PageShell section="Audit" title={charge ? "Dossier introuvable" : "Chargement…"}>
-        {charge ? (
+      <PageShell section="Audit" title={!charge ? "Chargement…" : erreur ? "Audits indisponibles" : "Dossier introuvable"}>
+        {!charge ? <Spinner /> : erreur ? (
+          <p className="muted">
+            {erreur}{" "}
+            <button className="btn btn-ghost btn-s" type="button" onClick={recharger}>Réessayer</button>
+          </p>
+        ) : (
           <p className="muted">
             Aucun dossier <b>{refDossier}</b>. <Link href="/audits">Retour aux audits</Link>
           </p>
-        ) : <Spinner />}
+        )}
       </PageShell>
     );
   }

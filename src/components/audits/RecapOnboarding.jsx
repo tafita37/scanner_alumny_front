@@ -3,6 +3,9 @@
 import Link from "next/link";
 import Card, { CardHead } from "@/components/ui/Card";
 import Note from "@/components/ui/Note";
+import { fmtEur, groupe } from "@/lib/format";
+
+const nombre = n => (n === null || n === undefined ? null : groupe(n));
 
 /* Étape 1 vue depuis un dossier existant : l'onboarding est déjà enregistré,
    on en affiche le récapitulatif. Un brouillon renvoie vers l'assistant. */
@@ -12,10 +15,18 @@ export default function RecapOnboarding({ dossier, onSuivant }) {
   const recap = [
     ["Entreprise", dossier.client],
     ["SIRET", dossier.siret],
+    ["Forme juridique", dossier.formeJuridique],
+    ["Code NAF", dossier.naf],
+    ["Commune", dossier.ville],
     ["Secteur (figé)", dossier.secteur],
     ["Contact dirigeant", dossier.contact],
-    ["Consultant", dossier.consultant],
-    ["Dernière mise à jour", dossier.maj]
+    ["E-mail", dossier.contactMail],
+    ["Téléphone", dossier.contactTel],
+    ["Effectif", nombre(dossier.effectif)],
+    ["Chiffre d'affaires", dossier.ca === null || dossier.ca === undefined ? null : fmtEur(dossier.ca)],
+    ["Bénéfice", dossier.benefices === null || dossier.benefices === undefined ? null : fmtEur(dossier.benefices)],
+    ["Année des comptes", dossier.annee],
+    ["Date d'audit", dossier.maj]
   ];
 
   return (
