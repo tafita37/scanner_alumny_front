@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageShell from "@/components/shell/PageShell";
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge, { StatusBadge } from "@/components/ui/Badge";
 import Chip from "@/components/ui/Chip";
-import { Bar, Table, TableWrap } from "@/components/ui/Misc";
+import { Bar, Spinner, Table, TableWrap } from "@/components/ui/Misc";
+import Note from "@/components/ui/Note";
 import { useDossiers } from "@/context/DossiersContext";
 import { ETAPES_AUDIT, estEnCours, libelleEtape, lienDossier } from "@/lib/dossiers";
 
@@ -19,10 +20,13 @@ const AVANCEMENTS = [
 
 /* Liste des audits : un clic reprend le dossier là où il s'est arrêté. */
 export default function AuditsView() {
-  const { dossiers } = useDossiers();
+  const { dossiers, charge, erreur, recharger } = useDossiers();
   const [avancement, setAvancement] = useState("en-cours");
   const [etape, setEtape] = useState(0);
   const [q, setQ] = useState("");
+
+  /* Liste relue à chaque ouverture de la page : on voit aussi les audits créés par les collègues. */
+  useEffect(() => { recharger(); }, [recharger]);
 
   const nbEnCours = useMemo(() => dossiers.filter(estEnCours).length, [dossiers]);
 
@@ -51,6 +55,13 @@ export default function AuditsView() {
           />
         </CardHead>
 
+        {erreur && (
+          <Note tone="gold" ico="!" className="mb">
+            Liste des audits indisponible : {erreur}{" "}
+            <button className="btn btn-ghost btn-s" type="button" onClick={recharger}>Réessayer</button>
+          </Note>
+        )}
+
         <div className="row gap-s wrap mb">
           <Chip active={etape === 0} onClick={() => setEtape(0)}>Toutes les étapes</Chip>
           {ETAPES_AUDIT.map(e => (
@@ -73,14 +84,22 @@ export default function AuditsView() {
           <Table>
             <thead>
               <tr>
-                <th>Référence</th><th>Client</th><th>Secteur</th><th>Étape</th>
-                <th>Consultant</th><th>MAJ</th><th />
+                <th>Référence</th>
+                <th>Client</th>
+                <th>Secteur</th>
+                <th>Étape</th>
+                <th>MAJ</th>
+                <th/>
               </tr>
             </thead>
             <tbody>
-              {liste.length === 0 ? (
+              {!charge ? (
+                <tr className="empty-row"><td colSpan={6}><Spinner /> Chargement des audits…</td></tr>
+              ) : liste.length === 0 ? (
                 <tr className="empty-row">
-                  <td colSpan={7}>Aucun dossier ne correspond à ces filtres.</td>
+                  <td colSpan={6}>
+                    {dossiers.length === 0 ? "Aucun audit pour le moment." : "Aucun dossier ne correspond à ces filtres."}
+                  </td>
                 </tr>
               ) : liste.map(d => {
                 const termine = !estEnCours(d);
@@ -103,7 +122,6 @@ export default function AuditsView() {
                     )}
                   </td>
                   {/* <td><StatusBadge statut={d.statut} /></td> */}
-                  <td className="small">{d.consultant}</td>
                   <td className="small faint nowrap">{d.maj}</td>
                   <td>
                     {termine

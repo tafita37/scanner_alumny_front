@@ -202,6 +202,16 @@ export function getSecteurs() {
   return apiFetch("/api/companies/industries/");
 }
 
+/* GET /api/companies/audits/ → tous les audits, du plus récent au plus ancien :
+   [{ id, siret_number, head_count, revenue, profit, publication_year, audit_date, remaining_step,
+      company: { id, siren_number, company_name, naf_code, creation_date,
+                 industry: { id, name }, city: { id, name, code_insee, department_code },
+                 company_type: { id, label, code },
+                 ceo_info: { id, email, phone_number, job_title, individual: { id, name, first_name } } } }] */
+export function listerAudits() {
+  return apiFetch("/api/companies/audits/");
+}
+
 /* POST /api/companies/audits/create/ → crée l'audit (et l'entreprise / le dirigeant au besoin).
    body : { company: { siren_number, company_name, naf_code, creation_date, industry, city, company_type },
             ceo: { name, first_name, email, phone_number, job_title },
