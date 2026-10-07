@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import Card, { CardHead } from "@/components/ui/Card";
 import Note from "@/components/ui/Note";
 import Badge from "@/components/ui/Badge";
-import { Bar, Spinner } from "@/components/ui/Misc";
+import { Bar, Placeholder, Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import { useUi } from "@/context/UiContext";
 import { ACCEPT, ETAPES_PIPELINE } from "@/lib/extractionSimulee";
@@ -22,7 +22,7 @@ function suivi(d) {
   return { label: `extrait (${d.mode})`, tone: d.mode === "OCR" ? "gold" : "ok", pct: 100 };
 }
 
-export default function DepotPieces({ docs, selection, onSelection, onAjouter, onSupprimer, onRelancer }) {
+export default function DepotPieces({ docs, chargement, onRecharger, selection, onSelection, onAjouter, onSupprimer, onRelancer }) {
   const [survol, setSurvol] = useState(false);
   const input = useRef(null);
   const { openModal, closeModal } = useUi();
@@ -49,12 +49,26 @@ export default function DepotPieces({ docs, selection, onSelection, onAjouter, o
   const apercu = d => openModal(
     <>
       <h2>{d.nom}</h2>
-      <div className="apercu mt">
-        {d.type === "PDF"
-          ? <iframe src={d.url} title={`Aperçu de ${d.nom}`} />
-          : // eslint-disable-next-line @next/next/no-img-element
-            <img src={d.url} alt={`Aperçu de ${d.nom}`} />}
-      </div>
+      {d.url ? (
+        <div className="apercu mt">
+          {d.type === "PDF"
+            ? <iframe src={d.url} title={`Aperçu de ${d.nom}`} />
+            : // eslint-disable-next-line @next/next/no-img-element
+              <img src={d.url} alt={`Aperçu de ${d.nom}`} />}
+        </div>
+      ) : (
+        <Placeholder style={{ height: 220, marginTop: 14 }}>
+          aperçu indisponible<br />(pas encore de route de téléchargement du fichier)
+        </Placeholder>
+      )}
+      {d.serveur && (
+        <dl className="doc-serveur mt">
+          <dt>Référence</dt><dd>document #{d.serveur.id}</dd>
+          <dt>Stocké sous</dt><dd className="mono">{d.serveur.nomStocke}</dd>
+          <dt>Déposé le</dt><dd>{d.serveur.creeLe.split("-").reverse().join("/")}</dd>
+          <dt>Taille</dt><dd>{d.taille}</dd>
+        </dl>
+      )}
       <p className="hint mt-s">
         {d.statut === "extrait"
           ? <>{d.champs.length} champs extraits · {d.categorie} n°{d.numero}</>
@@ -109,8 +123,17 @@ export default function DepotPieces({ docs, selection, onSelection, onAjouter, o
         source de la masse salariale et des charges fixes de structure utilisées par le moteur de calcul.
       </Note>
 
+      {chargement.erreur && (
+        <Note tone="gold" ico="!" className="mt">
+          Impossible de récupérer les pièces du dossier : {chargement.erreur}{" "}
+          <button className="btn btn-ghost btn-s" type="button" onClick={onRecharger}>Réessayer</button>
+        </Note>
+      )}
+
       {docs.length === 0 ? (
-        <p className="hint mt center">Aucune pièce déposée pour ce dossier.</p>
+        chargement.encours
+          ? <p className="hint mt center"><Spinner style={{ verticalAlign: -2, marginRight: 8 }} />Chargement des pièces du dossier…</p>
+          : !chargement.erreur && <p className="hint mt center">Aucune pièce déposée pour ce dossier.</p>
       ) : (
         <ul className="files mt">
           {docs.map((d, i) => {
@@ -128,20 +151,21 @@ export default function DepotPieces({ docs, selection, onSelection, onAjouter, o
                   <span className="file-nom">{d.nom}</span><br />
                   <span className="file-meta">
                     {d.cat || "à classer"} · {d.taille}
+                    {d.serveur && <> · <span title={`Stocké sous ${d.serveur.nomStocke}`}>#{d.serveur.id}</span></>}
                     {d.statut === "erreur" && <> · <span className="txt-bad">{d.erreur}</span></>}
                   </span>
                   {(actif || d.statut === "attente") && <Bar value={s.pct} className="file-bar" />}
                 </span>
-                <Badge tone={s.tone}>
-                  {actif && <Spinner className="spin-xs" />}
-                  {s.label}
+                <Badge tone={d.suppression ? "ink" : s.tone}>
+                  {(actif || d.suppression) && <Spinner className="spin-xs" />}
+                  {d.suppression ? "suppression…" : s.label}
                 </Badge>
                 <span className="tbl-actions" onClick={e => e.stopPropagation()}>
                   {(d.statut === "extrait" || d.statut === "erreur") && (
-                    <button className="btn btn-icon" type="button" title="Relancer l'extraction" onClick={() => onRelancer(d.id)}>↻</button>
+                    <button className="btn btn-icon" type="button" title="Relancer l'extraction" disabled={d.suppression} onClick={() => onRelancer(d.id)}>↻</button>
                   )}
                   <button className="btn btn-icon" type="button" title="Voir le fichier original" onClick={() => apercu(d)}>◱</button>
-                  <button className="btn btn-icon" type="button" title="Supprimer (fichier + référence)" onClick={() => confirmerSuppression(d)}>✕</button>
+                  <button className="btn btn-icon" type="button" title="Supprimer (fichier + référence)" disabled={d.suppression} onClick={() => confirmerSuppression(d)}>✕</button>
                 </span>
               </li>
             );

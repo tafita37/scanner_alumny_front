@@ -76,7 +76,7 @@ export default function DossierView({ refDossier, etapeDemandee }) {
 
       {vue === 1 && <RecapOnboarding dossier={dossier} onSuivant={() => aller(2)} />}
 
-      {vue === 2 && <EtapeDocuments onSuivant={() => avancer(3, { statut: "analysé" })} />}
+      {vue === 2 && <EtapeDocuments auditId={dossier.id} onSuivant={() => avancer(3, { statut: "analysé" })} />}
 
       {vue === 3 && <EtapeCockpit dossier={dossier} onSuivant={() => avancer(4)} />}
 
