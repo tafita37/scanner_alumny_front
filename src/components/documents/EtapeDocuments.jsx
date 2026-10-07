@@ -11,14 +11,14 @@ import { detecterAnomalies } from "@/lib/extractionSimulee";
 import { useUi } from "@/context/UiContext";
 
 /* Étape 2 du dossier d'audit : dépôt des pièces, extraction et validation des champs.
-   L'extraction est simulée côté front (voir useExtractionDocuments) en attendant l'API.
-   onSuivant : passe au cockpit */
-export default function EtapeDocuments({ onSuivant }) {
+   Le téléversement passe par l'API ; l'extraction reste simulée (voir useExtractionDocuments).
+   auditId : id de l'audit auquel rattacher les pièces · onSuivant : passe au cockpit */
+export default function EtapeDocuments({ auditId, onSuivant }) {
   const [masque, setMasque] = useState(true);
   const [moteur, setMoteur] = useState("local");
   const [selection, setSelection] = useState(null);
   const { toast } = useUi();
-  const { docs, journal, actifId, ajouter, supprimer, relancer, corriger } = useExtractionDocuments({ moteur, toast });
+  const { docs, journal, actifId, chargement, recharger, ajouter, supprimer, relancer, corriger } = useExtractionDocuments({ auditId, moteur, toast });
 
   const extraits = docs.filter(d => d.statut === "extrait");
   const enFile = docs.filter(d => d.statut === "attente").length;
@@ -28,10 +28,8 @@ export default function EtapeDocuments({ onSuivant }) {
   const docSuivi = docs.find(d => d.id === actifId) || docs.find(d => d.id === selection) || docs.at(-1) || null;
   const docExtrait = extraits.find(d => d.id === selection) || extraits.at(-1) || null;
 
-  const supprimerDoc = id => {
-    supprimer(id);
-    if (selection === id) setSelection(null);
-    toast("Document supprimé — recalcul du dossier déclenché.");
+  const supprimerDoc = async id => {
+    if (await supprimer(id)) setSelection(s => (s === id ? null : s));
   };
 
   // const besoins = [
@@ -47,6 +45,8 @@ export default function EtapeDocuments({ onSuivant }) {
       <section className="col gap-l">
         <DepotPieces
           docs={docs}
+          chargement={chargement}
+          onRecharger={recharger}
           selection={docSuivi?.id}
           onSelection={setSelection}
           onAjouter={ajouter}

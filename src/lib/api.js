@@ -48,20 +48,25 @@ function messageErreur(data, status) {
 }
 
 /* Requête HTTP brute, sans aucune gestion de session */
-async function requete(chemin, { method = "GET", body, token, headers = {} } = {}) {
+async function requete(chemin, { method = "GET", body, token, headers = {}, signal } = {}) {
+  /* FormData (upload de fichiers) : envoyé tel quel, le navigateur pose lui-même
+     le Content-Type multipart avec sa frontière. */
+  const multipart = typeof FormData !== "undefined" && body instanceof FormData;
   let reponse;
   try {
     reponse = await fetch(API_URL + chemin, {
       method,
+      signal,
       headers: {
         Accept: "application/json",
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body)
     });
   } catch(error) {
+    if (error.name === "AbortError") throw error;
     console.log("Erreur de connexion à l'API :", error);
     throw new ApiError("Impossible de joindre le serveur. Vérifiez votre connexion.");
   }
@@ -219,4 +224,24 @@ export function listerAudits() {
    → { id, siret_number, head_count, revenue, profit, publication_year, company_id, siren_number, company_name, … } */
 export function creerAudit(body) {
   return apiFetch("/api/companies/audits/create/", { method: "POST", body });
+}
+
+/* GET /api/companies/audits/<audit_id>/documents/ → documents de l'audit, du plus ancien au plus récent :
+   [{ id, original_name, stored_name, size, mime_type, created_at, audit_id }] */
+export function listerDocuments(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/documents/`, { signal });
+}
+
+/* DELETE /api/companies/documents/<document_id>/delete/ → 204 ; supprime la ligne et le fichier stocké.
+   404 { detail: "Document introuvable." } s'il n'existe plus. */
+export function supprimerDocument(documentId) {
+  return apiFetch(`/api/companies/documents/${encodeURIComponent(documentId)}/delete/`, { method: "DELETE" });
+}
+
+/* POST /api/companies/audits/<audit_id>/documents/upload/ (multipart : `files` répété une fois par fichier)
+   → [{ id, original_name, stored_name, size, mime_type, created_at, audit_id }] */
+export function uploaderDocuments(auditId, files, { signal } = {}) {
+  const body = new FormData();
+  Array.from(files).forEach(f => body.append("files", f));
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/documents/upload/`, { method: "POST", body, signal });
 }
