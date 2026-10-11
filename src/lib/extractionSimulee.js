@@ -8,20 +8,44 @@
 import { groupe } from "@/lib/format";
 
 export const TAILLE_MAX = 20 * 1024 * 1024;
-export const ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
 export const SEUIL_CONFIANCE = 0.75;
 
-const EXTENSIONS = { pdf: "PDF", jpg: "JPG", jpeg: "JPG", png: "PNG" };
+/* Extension → libellé affiché et famille, qui décide du chemin dans le pipeline :
+   « image » passe par l'OCR, les autres sont lues directement.
+   csv / xml / txt couvrent exports comptables, factures UBL/CII et FEC. */
+const EXTENSIONS = {
+  pdf: ["PDF", "pdf"],
+  jpg: ["JPG", "image"], jpeg: ["JPG", "image"], png: ["PNG", "image"],
+  webp: ["WEBP", "image"], tif: ["TIFF", "image"], tiff: ["TIFF", "image"], heic: ["HEIC", "image"],
+  xlsx: ["XLSX", "tableur"], xlsm: ["XLSM", "tableur"], xls: ["XLS", "tableur"], ods: ["ODS", "tableur"],
+  docx: ["DOCX", "texte"], doc: ["DOC", "texte"], odt: ["ODT", "texte"],
+  csv: ["CSV", "donnees"], xml: ["XML", "donnees"], txt: ["TXT", "donnees"]
+};
+const FAMILLES = Object.fromEntries(Object.values(EXTENSIONS));
+
+export const ACCEPT = Object.keys(EXTENSIONS).map(ext => `.${ext}`).join(",");
+export const FORMATS_ACCEPTES = "PDF, images, Excel, Word, CSV, XML";
 
 /* Renvoie un message d'erreur, ou null si le fichier est acceptable. */
 export function validerFichier(file) {
   const ext = file.name.split(".").pop().toLowerCase();
-  if (!EXTENSIONS[ext]) return `« ${file.name} » : format non pris en charge (PDF, JPG, PNG uniquement).`;
+  if (!EXTENSIONS[ext]) return `« ${file.name} » : format non pris en charge (${FORMATS_ACCEPTES}).`;
   if (file.size > TAILLE_MAX) return `« ${file.name} » dépasse 20 Mo.`;
   return null;
 }
 
-export const typeFichier = file => EXTENSIONS[file.name.split(".").pop().toLowerCase()] || "?";
+export const typeFichier = file => EXTENSIONS[file.name.split(".").pop().toLowerCase()]?.[0] || "?";
+export const estImage = type => FAMILLES[type] === "image";
+/* Formats que le navigateur sait afficher tels quels dans l'aperçu (TIFF et HEIC non). */
+export const apercuIframe = type => type === "PDF";
+export const apercuImage = type => ["JPG", "PNG", "WEBP"].includes(type);
+
+/* Message de l'étape « natif » pour un document lu sans OCR. */
+export function lectureNative(type, pages) {
+  if (FAMILLES[type] === "tableur") return `lecture directe · ${pages} feuille${pages > 1 ? "s" : ""}`;
+  if (FAMILLES[type] === "donnees") return "lecture directe · données structurées";
+  return `texte natif · ${pages} p.`;
+}
 
 export function formatTaille(octets) {
   if (octets < 1024) return `${octets} o`;
@@ -67,7 +91,7 @@ export function generateur(graine) {
 /* ---------- Pipeline ---------- */
 
 export const ETAPES_PIPELINE = [
-  { k: "natif", n: 1, titre: "Extraction native du texte", desc: "rapide, gratuite — si le PDF contient une vraie couche de texte" },
+  { k: "natif", n: 1, titre: "Extraction native du texte", desc: "rapide, gratuite — PDF avec couche texte, Excel, Word, CSV, XML" },
   { k: "ocr", n: 2, titre: "Bascule OCR / Vision LLM", desc: "Qwen 2.5 VL 7B en local via Ollama — image → JSON en un appel" },
   { k: "anon", n: 3, titre: "Anonymisation locale", desc: "regex (e-mail, téléphone) + NER Presidio/spaCy (nom, adresse)" },
   { k: "llm", n: 4, titre: "Extraction structurée JSON strict", desc: null },
@@ -95,9 +119,8 @@ function champ(r, k, label, brut, val, { ocr, pii = false, fragile = false }) {
 }
 
 /* Produit la catégorie, les champs, les entités anonymisées et le texte source d'un document. */
-export function extraireDocument({ nom, taille, type, cat }) {
+export function extraireDocument({ nom, taille, ocr, cat }) {
   const r = generateur(`${nom}|${taille}`);
-  const ocr = type !== "PDF";
   const categorie = cat || r.choix(["Devis", "Devis", "Facture"]);
   const numero = `${r.choix(["2024", "2025"])}-${r.entier(100, 399)}`;
 
