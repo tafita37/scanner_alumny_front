@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { listerDocuments, supprimerDocument, uploaderDocuments } from "@/lib/api";
 import { heureCourante } from "@/lib/format";
 import {
-  SEUIL_CONFIANCE, devinerCategorie, etapesVierges, extraireDocument,
-  formatTaille, generateur, typeFichier, validerFichier
+  SEUIL_CONFIANCE, devinerCategorie, estImage, etapesVierges, extraireDocument,
+  formatTaille, generateur, lectureNative, typeFichier, validerFichier
 } from "@/lib/extractionSimulee";
 
 let seq = 0;
@@ -46,21 +46,22 @@ const msgCheck = faibles => (faibles ? `${plurielChamps(faibles)} sous le seuil`
    persistée : on rejoue la simulation, déterministe, donc identique à celle du dépôt. */
 function docDepuisServeur(row) {
   const type = typeFichier({ name: row.original_name });
-  const image = type !== "PDF";
-  const res = extraireDocument({ nom: row.original_name, taille: row.size, type, cat: devinerCategorie(row.original_name) });
+  const mimeImage = type === "?" && row.mime_type?.startsWith("image/");
+  const image = estImage(type) || mimeImage;
+  const res = extraireDocument({ nom: row.original_name, taille: row.size, ocr: image, cat: devinerCategorie(row.original_name) });
   const faibles = res.champs.filter(c => c.conf < SEUIL_CONFIANCE).length;
   return {
     id: `srv-${row.id}`,
     url: null,
     nom: row.original_name,
-    type: type === "?" && row.mime_type?.startsWith("image/") ? row.mime_type.slice(6).toUpperCase() : type,
+    type: mimeImage ? row.mime_type.slice(6).toUpperCase() : type,
     octets: row.size,
     taille: formatTaille(row.size),
     televerse: true,
     progression: 100,
     serveur: { id: row.id, nomStocke: row.stored_name, creeLe: row.created_at },
     etapes: [
-      image ? { k: "natif", statut: "skip", msg: "aucune couche texte" } : { k: "natif", statut: "ok", msg: `texte natif · ${res.pages} p.` },
+      image ? { k: "natif", statut: "skip", msg: "aucune couche texte" } : { k: "natif", statut: "ok", msg: lectureNative(type, res.pages) },
       image ? { k: "ocr", statut: "ok", msg: `vision locale · ${res.pages} p.` } : { k: "ocr", statut: "skip", msg: "non nécessaire" },
       { k: "anon", statut: "ok", msg: `${Object.keys(res.entites).length} entités masquées` },
       { k: "llm", statut: "ok", msg: `${plurielChamps(res.champs.length)} · schéma valide` },
@@ -204,9 +205,9 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
       phase = "analyse";
 
       maj(doc.id, { statut: "analyse", etapes: etapesVierges(), erreur: null });
-      const image = doc.type !== "PDF";
+      const image = estImage(doc.type);
       const externe = moteurRef.current === "externe";
-      const res = extraireDocument({ nom: doc.nom, taille: doc.octets, type: doc.type, cat: doc.cat });
+      const res = extraireDocument({ nom: doc.nom, taille: doc.octets, ocr: image, cat: doc.cat });
 
       /* 1. Couche texte native */
       etape("natif", "run");
@@ -219,7 +220,7 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
         etape("natif", "skip", "aucune couche texte");
         log(`${doc.nom} : image sans couche texte → bascule OCR`, "gold");
       } else {
-        etape("natif", "ok", `texte natif · ${res.pages} p.`);
+        etape("natif", "ok", lectureNative(doc.type, res.pages));
       }
 
       /* 2. OCR / Vision LLM (images uniquement) */

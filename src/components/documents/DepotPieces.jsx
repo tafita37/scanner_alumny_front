@@ -7,7 +7,7 @@ import Badge from "@/components/ui/Badge";
 import { Bar, Placeholder, Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import { useUi } from "@/context/UiContext";
-import { ACCEPT, ETAPES_PIPELINE } from "@/lib/extractionSimulee";
+import { ACCEPT, ETAPES_PIPELINE, FORMATS_ACCEPTES, apercuIframe, apercuImage } from "@/lib/extractionSimulee";
 
 /* Libellé, teinte du badge et avancement global (0-100) d'un document. */
 function suivi(d) {
@@ -49,16 +49,17 @@ export default function DepotPieces({ docs, chargement, onRecharger, selection, 
   const apercu = d => openModal(
     <>
       <h2>{d.nom}</h2>
-      {d.url ? (
+      {d.url && (apercuIframe(d.type) || apercuImage(d.type)) ? (
         <div className="apercu mt">
-          {d.type === "PDF"
+          {apercuIframe(d.type)
             ? <iframe src={d.url} title={`Aperçu de ${d.nom}`} />
             : // eslint-disable-next-line @next/next/no-img-element
               <img src={d.url} alt={`Aperçu de ${d.nom}`} />}
         </div>
       ) : (
         <Placeholder style={{ height: 220, marginTop: 14 }}>
-          aperçu indisponible<br />(pas encore de route de téléchargement du fichier)
+          aperçu indisponible<br />
+          {d.url ? `(format ${d.type} non affichable dans le navigateur)` : "(pas encore de route de téléchargement du fichier)"}
         </Placeholder>
       )}
       {d.serveur && (
@@ -106,7 +107,7 @@ export default function DepotPieces({ docs, chargement, onRecharger, selection, 
       >
         <div className="drop-ico">⇪</div>
         <b>Dépose devis, factures et bilan comptable</b>
-        <span className="small muted">PDF, JPG, PNG — 20 Mo max par fichier</span>
+        <span className="small muted">{FORMATS_ACCEPTES} — 20 Mo max par fichier</span>
         <span className="btn btn-soft btn-s mt-s">Parcourir les fichiers</span>
         <input
           ref={input}
