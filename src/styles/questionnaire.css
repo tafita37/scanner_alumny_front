@@ -1,0 +1,69 @@
+/* Étape Questions de l'agent (questionnaire adaptatif) */
+
+/* Une question */
+.qa {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: var(--r-m);
+  background: var(--surface);
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  animation: rise .35s ease both;
+}
+.qa.is-edit { border-left-color: var(--warn); box-shadow: var(--shadow-s); }
+.qa-repondue { border-left-color: var(--ok); }
+.qa-ignoree { border-left-color: var(--ink-faint); background: #fbfbfc; }
+
+.qa-head { display: flex; align-items: flex-start; gap: 12px; }
+.qa-n {
+  width: 26px; height: 26px; border-radius: 50%; flex: none;
+  background: var(--blue-soft); color: var(--blue);
+  display: grid; place-items: center; font-size: 12px; font-weight: bold;
+}
+.qa-repondue .qa-n { background: var(--ok-bg); color: var(--ok); }
+.qa-label { font-family: var(--font-body); font-size: 14px; font-weight: bold; line-height: 1.45; margin: 2px 0 0; color: var(--ink); }
+.qa-why { font-size: 12.5px; color: var(--ink-soft); margin: 4px 0 0; }
+.qa-docs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.qa-docs span {
+  font-size: 11.5px; color: var(--blue-dark);
+  background: var(--blue-soft); border-radius: var(--r-pill);
+  padding: 2px 9px;
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.qa-body { display: flex; flex-direction: column; gap: 12px; padding-left: 38px; }
+.qa-done { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.qa-answer { font-size: 13.5px; }
+.qa-err { display: block; }
+
+.qa-sugg { border-left: 3px solid var(--gold); }
+.qa-sugg-t { font-size: 12px; font-weight: bold; color: #8d6222; }
+.qa-sugg-t::before { content: "◈ "; color: var(--gold); }
+
+/* Saisie numérique suivie de son unité */
+.qa-unit { display: flex; align-items: center; gap: 8px; max-width: 280px; }
+.qa-unit input { flex: 1; min-width: 0; }
+.qa-unit span { font-size: 13px; color: var(--ink-soft); font-weight: bold; }
+.qa .field input[type=date] { max-width: 220px; }
+
+/* Génération, analyse, enquête */
+.qn-gen p { margin: 4px 0 0; }
+.qn-analysis { white-space: pre-line; margin: 6px 0 0; }
+.qn-errors { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+
+.qn-enquete { margin-top: 10px; font-size: 12.5px; }
+.qn-enquete summary { cursor: pointer; color: #8d6222; font-weight: bold; }
+.qn-enquete ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.qn-enquete .mono { color: var(--ink-soft); word-break: break-word; }
+
+/* Tours précédents (lecture seule) */
+.qn-old { border: 1px solid var(--line); border-radius: var(--r-m); padding: 10px 14px; background: var(--surface); }
+.qn-old summary { cursor: pointer; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.qn-old[open] summary { margin-bottom: 8px; }
+.qn-old-analysis { margin: 0 0 8px; white-space: pre-line; }
+.qn-old-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.qn-old-list li span:first-child { margin-right: 8px; }
+
+@media (max-width: 640px) {
+  .qa-body { padding-left: 0; }
+}

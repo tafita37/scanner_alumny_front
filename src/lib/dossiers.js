@@ -1,13 +1,14 @@
 /* ------------------------------------------------------------
-   Parcours d'un dossier d'audit : les 4 étapes enchaînées
+   Parcours d'un dossier d'audit : les 5 étapes enchaînées
    depuis la page du dossier (/audits/<ref>).
    ------------------------------------------------------------ */
 
 export const ETAPES_AUDIT = [
   { n: 1, label: "Onboarding" },
   { n: 2, label: "Analyse documentaire" },
-  { n: 3, label: "Cockpit & résultats" },
-  { n: 4, label: "Rapport" }
+  { n: 3, label: "Questions de l'agent" },
+  { n: 4, label: "Cockpit & résultats" },
+  { n: 5, label: "Rapport" }
 ];
 
 /* Statuts d'un dossier dont l'audit est terminé : il sort du filtre « En cours » de la liste des audits. */
@@ -28,11 +29,13 @@ export const refAudit = id => `A-${id}`;
 const dateFr = iso => (iso ? iso.split("-").reverse().join("/") : null);
 
 /* Statut affiché, déduit de l'étape atteinte */
-const STATUT_PAR_ETAPE = { 1: "brouillon", 2: "documents en attente", 3: "analysé", 4: "analysé" };
+const STATUT_PAR_ETAPE = {
+  1: "brouillon", 2: "documents en attente", 3: "en cours d'analyse", 4: "analysé", 5: "analysé"
+};
 
 /* Audit renvoyé par GET /api/companies/audits/ → dossier affiché par l'interface.
-   remaining_step : étapes restant à faire (3 à la création, l'onboarding étant fait ; 0 = audit terminé),
-   d'où l'étape en cours = 5 − remaining_step. */
+   remaining_step : étapes restant à faire (4 à la création, l'onboarding étant fait ; 0 = audit terminé),
+   d'où l'étape en cours = 6 − remaining_step. */
 export function dossierDepuisApi(a) {
   const c = a.company ?? {};
   const ceo = c.ceo_info;

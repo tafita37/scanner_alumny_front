@@ -7,18 +7,15 @@ import AnomaliesDetectees from "@/components/documents/AnomaliesDetectees";
 import ExtractionPanel from "@/components/documents/ExtractionPanel";
 // import DocumentsAside from "@/components/documents/DocumentsAside";
 import { useExtractionDocuments } from "@/components/documents/useExtractionDocuments";
-import { detecterAnomalies } from "@/lib/extractionSimulee";
+import { detecterAnomalies } from "@/lib/extraction";
 import { useUi } from "@/context/UiContext";
 
-/* Étape 2 du dossier d'audit : dépôt des pièces, extraction et validation des champs.
-   Le téléversement passe par l'API ; l'extraction reste simulée (voir useExtractionDocuments).
-   auditId : id de l'audit auquel rattacher les pièces · onSuivant : passe au cockpit */
+/* Étape 2 du dossier d'audit : dépôt des pièces, extraction par l'API et relecture des champs.
+   auditId : id de l'audit auquel rattacher les pièces · onSuivant : passe aux questions de l'agent */
 export default function EtapeDocuments({ auditId, onSuivant }) {
-  const [masque, setMasque] = useState(true);
-  const [moteur, setMoteur] = useState("local");
   const [selection, setSelection] = useState(null);
   const { toast } = useUi();
-  const { docs, journal, actifId, chargement, recharger, ajouter, supprimer, relancer, corriger } = useExtractionDocuments({ auditId, moteur, toast });
+  const { docs, journal, actifId, chargement, recharger, ajouter, supprimer, relancer, corriger } = useExtractionDocuments({ auditId, toast });
 
   const extraits = docs.filter(d => d.statut === "extrait");
   const enFile = docs.filter(d => d.statut === "attente").length;
@@ -53,35 +50,18 @@ export default function EtapeDocuments({ auditId, onSuivant }) {
           onSupprimer={supprimerDoc}
           onRelancer={relancer}
         />
-        <PipelineExtraction
-          doc={docSuivi}
-          enFile={enFile}
-          journal={journal}
-          moteur={moteur}
-          onMoteur={setMoteur}
-          onRelancer={relancer}
-        />
+        <PipelineExtraction doc={docSuivi} enFile={enFile} journal={journal} onRelancer={relancer} />
         <AnomaliesDetectees anomalies={anomalies} nbExtraits={extraits.length} />
-        <ExtractionPanel
-          docs={extraits}
-          doc={docExtrait}
-          onSelection={setSelection}
-          masque={masque}
-          onMasque={valeur => {
-            setMasque(valeur);
-            toast(valeur ? "Valeurs re-masquées." : "Démasquage via la table de correspondance locale.");
-          }}
-          onCorriger={corriger}
-        />
+        <ExtractionPanel docs={extraits} doc={docExtrait} onSelection={setSelection} onCorriger={corriger} />
 
         <div className="row-between">
           <span className="hint">
             {extraits.length
-              ? `${extraits.length} document${extraits.length > 1 ? "s" : ""} extrait${extraits.length > 1 ? "s" : ""} — les champs validés alimentent le cockpit du dossier.`
-              : "Les champs validés alimentent le cockpit du dossier."}
+              ? `${extraits.length} document${extraits.length > 1 ? "s" : ""} extrait${extraits.length > 1 ? "s" : ""} — l'agent s'en sert pour préparer ses questions.`
+              : "Au moins un document extrait est nécessaire pour que l'agent prépare ses questions."}
           </span>
-          <button className="btn" type="button" disabled={Boolean(actifId) || enFile > 0} onClick={onSuivant}>
-            Passer au cockpit →
+          <button className="btn" type="button" disabled={Boolean(actifId) || enFile > 0 || !extraits.length} onClick={onSuivant}>
+            Passer aux questions →
           </button>
         </div>
       </section>

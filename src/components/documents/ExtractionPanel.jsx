@@ -8,14 +8,7 @@ import Tabs, { TabPanel } from "@/components/ui/Tabs";
 import { Field, Table, TableWrap } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import { useUi } from "@/context/UiContext";
-import { SEUIL_CONFIANCE } from "@/lib/extractionSimulee";
-
-const DETECTION = {
-  EMAIL: ["E-mail", "Regex", "re / validator"],
-  PHONE: ["Téléphone", "Regex", "re / phonenumbers"],
-  PERSON: ["Nom de personne", "NER local", "Presidio + spaCy fr"],
-  ADDRESS: ["Adresse postale", "NER local", "Presidio + spaCy fr"]
-};
+import { formatValeur, libelle, sectionsDocument, tableauxDocument, titreDocument } from "@/lib/extraction";
 
 /* Coloration simple du JSON : clés en bleu, valeurs en or — comme la maquette. */
 function JsonStrict({ objet }) {
@@ -37,9 +30,62 @@ function JsonStrict({ objet }) {
   );
 }
 
+/* Bloc « libellé → valeur » ; corrections : { chemin: valeur saisie } */
+function Section({ section, corrections, onCorriger }) {
+  return (
+    <div>
+      <span className="lbl">{section.titre}</span>
+      <TableWrap className="mt-s">
+        <Table>
+          <tbody>
+            {section.champs.map(c => {
+              const corrige = corrections[c.chemin];
+              return (
+                <tr key={c.chemin}>
+                  <td>
+                    {c.label}
+                    {c.calcule && <> <Badge tone="sky">calculé</Badge></>}
+                    {corrige !== undefined && <> <Badge tone="ok">corrigé</Badge></>}
+                  </td>
+                  <td className="cell-strong">{corrige ?? formatValeur(c.cle, c.valeur)}</td>
+                  <td className="right">
+                    <button className="btn btn-ghost btn-s" type="button" onClick={() => onCorriger(c)}>Corriger</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      </TableWrap>
+    </div>
+  );
+}
+
+function Tableau({ tableau }) {
+  return (
+    <div className="mt">
+      <span className="lbl">{tableau.titre} ({tableau.lignes.length})</span>
+      <TableWrap className="mt-s">
+        <Table>
+          <thead>
+            <tr>{tableau.colonnes.map(cle => <th key={cle}>{libelle(cle)}</th>)}</tr>
+          </thead>
+          <tbody>
+            {tableau.lignes.map((ligne, i) => (
+              <tr key={i}>
+                {tableau.colonnes.map(cle => <td key={cle}>{formatValeur(cle, ligne[cle])}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </TableWrap>
+    </div>
+  );
+}
+
 /* docs : documents extraits · doc : celui affiché (null → état vide) */
-export default function ExtractionPanel({ docs, doc, onSelection, masque, onMasque, onCorriger }) {
-  const [onglet, setOnglet] = useState("champs");
+export default function ExtractionPanel({ docs, doc, onSelection, onCorriger }) {
+  const [onglet, setOnglet] = useState("donnees");
   const { openModal, closeModal, toast } = useUi();
 
   if (!doc) {
@@ -51,34 +97,25 @@ export default function ExtractionPanel({ docs, doc, onSelection, masque, onMasq
     );
   }
 
-  const confGlobale = doc.champs.reduce((s, c) => s + c.conf, 0) / doc.champs.length;
-  const objetJson = {
-    document_id: doc.nom.replace(/\.[^.]+$/, ""),
-    categorie: doc.categorie,
-    secteur: "BTP",
-    mode_extraction: doc.mode,
-    ...Object.fromEntries(doc.champs.map(c => [c.k, c.pii && masque ? "<PERSON_1>" : c.brut])),
-    ...(doc.categorie === "Bilan comptable" ? {} : { tva: null }),
-    confiance_globale: Math.round(confGlobale * 100) / 100
-  };
-
-  const delai = doc.champs.find(c => c.k === "conditions_paiement_jours");
-  const delaiJours = delai ? Number(delai.brut) : null;
+  const { resultat } = doc;
+  const titre = titreDocument(resultat);
+  const sections = sectionsDocument(resultat);
+  const tableaux = tableauxDocument(resultat);
+  const aVerifier = resultat.status !== "ok";
+  const ongletActif = onglet === "tableaux" && !tableaux.length ? "donnees" : onglet;
 
   const ouvrirCorrection = champ => {
-    let valeur = champ.val;
+    let valeur = doc.corrections[champ.chemin] ?? formatValeur(champ.cle, champ.valeur);
     openModal(
       <>
         <h2>Corriger « {champ.label} »</h2>
-        <p className="small muted">
-          Confiance {champ.conf.toFixed(2)} · source : {doc.categorie.toLowerCase()} n°{doc.numero} ({doc.nom})
-        </p>
+        <p className="small muted">Source : {titre} ({doc.nom})</p>
         <Field label="Valeur" className="mt">
-          <input type="text" defaultValue={champ.val} onChange={e => { valeur = e.target.value; }} />
+          <input type="text" defaultValue={valeur} onChange={e => { valeur = e.target.value; }} />
         </Field>
-        <Note tone="blue" ico="↻" className="mt">
-          Toute correction déclenche un <b>recalcul en cascade</b> des résultats du dossier :
-          les indicateurs ne sont jamais saisis à la main.
+        <Note tone="gold" ico="!" className="mt">
+          Correction <b>locale</b> : elle n&apos;est pas encore enregistrée sur le serveur et n&apos;est pas
+          reprise dans les indicateurs du dossier.
         </Note>
         <ModalActions>
           <button className="btn btn-ghost" type="button" onClick={closeModal}>Annuler</button>
@@ -86,145 +123,79 @@ export default function ExtractionPanel({ docs, doc, onSelection, masque, onMasq
             className="btn" type="button"
             onClick={() => {
               closeModal();
-              onCorriger(doc.id, champ.k, valeur);
-              toast("Champ corrigé — résultats du dossier recalculés.", "ok");
+              onCorriger(doc.id, champ.chemin, valeur);
+              toast("Champ corrigé localement.", "ok");
             }}
           >
-            Enregistrer &amp; recalculer
+            Enregistrer
           </button>
         </ModalActions>
       </>
     );
   };
 
-  const occurrences = type => doc.texte.filter(s => s.pii === type).length;
-
   return (
     <Card>
       <CardHead>
-        <h2>Extraction — {doc.categorie.toLowerCase()} n°{doc.numero}</h2>
+        <h2>Extraction — {titre}</h2>
         <div className="row gap-s wrap">
           {docs.length > 1 && (
             <select className="select-s" value={doc.id} onChange={e => onSelection(e.target.value)} aria-label="Document affiché">
               {docs.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}
             </select>
           )}
-          <button className="btn btn-ghost btn-s" type="button" onClick={() => onMasque(!masque)}>
-            {masque ? "Démasquer les valeurs" : "Masquer les valeurs"}
-          </button>
+          {aVerifier ? <Badge tone="gold">à vérifier</Badge> : <Badge tone="ok">conforme</Badge>}
         </div>
       </CardHead>
 
-      <Tabs
-        value={onglet} onChange={setOnglet}
-        items={[
-          { id: "champs", label: "Champs extraits" },
-          { id: "json", label: "JSON strict" },
-          { id: "anon", label: "Anonymisation" }
-        ]}
-      />
-
-      <TabPanel active={onglet === "champs"}>
-        {/* Enveloppe de défilement : sans elle le tableau débordait de la carte sur mobile. */}
-        <TableWrap>
-        <Table>
-          <thead>
-            <tr><th>Champ</th><th>Valeur extraite</th><th>Confiance</th><th /></tr>
-          </thead>
-          <tbody>
-            {doc.champs.map(c => (
-              <tr key={c.k} className={c.conf < SEUIL_CONFIANCE ? "low" : undefined}>
-                <td>
-                  {c.label}
-                  {c.pii && <> <Badge tone="gold">PII</Badge></>}
-                  {c.corrige && <> <Badge tone="ok">corrigé</Badge></>}
-                </td>
-                <td className="cell-strong">{c.pii && masque ? "<PERSON_1>" : c.val}</td>
-                <td>
-                  <span className="conf">
-                    <span className={"conf-bar" + (c.conf < SEUIL_CONFIANCE ? " low" : "")}>
-                      <i style={{ width: `${c.conf * 100}%` }} />
-                    </span>
-                    {c.conf.toFixed(2)}
-                  </span>
-                </td>
-                <td className="right">
-                  <button className="btn btn-ghost btn-s" type="button" onClick={() => ouvrirCorrection(c)}>
-                    Corriger
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {delai && (
-              <tr>
-                <td>Délai de paiement légal (LME)</td>
-                <td className="cell-strong">60 j max</td>
-                <td>
-                  {delaiJours > 60
-                    ? <Badge tone="bad">dépassement détecté</Badge>
-                    : <Badge tone="ok">conforme</Badge>}
-                </td>
-                <td />
-              </tr>
-            )}
-          </tbody>
-        </Table>
-        </TableWrap>
-        <p className="hint mt-s">
-          Les champs sous le seuil de confiance sont surlignés : un <b>Update</b> manuel déclenche
-          le recalcul en cascade des résultats du dossier.
-        </p>
-      </TabPanel>
-
-      <TabPanel active={onglet === "json"}>
-        <JsonStrict objet={objetJson} />
-        <p className="hint">
-          Validation stricte du schéma côté backend (Pydantic / Zod) avant toute utilisation par le moteur de calcul.
-        </p>
-      </TabPanel>
-
-      <TabPanel active={onglet === "anon"}>
-        <div className="grid g-2">
-          <div>
-            <span className="lbl">Texte brut (local uniquement)</span>
-            <pre className="json mt-s">
-              {doc.texte.map((s, i) => (s.pii ? <mark key={i}>{s.t}</mark> : <span key={i}>{s.t}</span>))}
-            </pre>
-          </div>
-          <div>
-            <span className="lbl">Texte anonymisé (envoyé au LLM)</span>
-            <pre className="json mt-s">
-              {doc.texte.map((s, i) => (s.pii ? <b key={i}>{`<${s.pii}_1>`}</b> : <span key={i}>{s.t}</span>))}
-            </pre>
-          </div>
-        </div>
-
-        <Note ico="🔒" className="mt">
-          Substitution de mots, pas de chiffrement. La table de correspondance{" "}
-          <span className="mono">token → valeur réelle</span> reste stockée <b>localement</b> pour le démasquage
-          à l&apos;affichage interne. L&apos;anonymisation porte sur le <b>texte</b>, jamais sur l&apos;image —
-          d&apos;où l&apos;intérêt d&apos;un OCR local en amont.
+      {aVerifier && (
+        <Note tone="gold" ico="!" className="mb">
+          <b>Extraction à vérifier</b> : relis le document original avant d&apos;utiliser ces valeurs.
+          {resultat.errors.length > 0 && (
+            <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+              {resultat.errors.map((err, i) => <li key={i}>{err}</li>)}
+            </ul>
+          )}
         </Note>
+      )}
 
-        <TableWrap className="mt">
-          <Table>
-            <thead>
-              <tr><th>Type</th><th>Méthode de détection</th><th>Outil</th><th className="right">Occurrences</th></tr>
-            </thead>
-            <tbody>
-              {Object.keys(doc.entites).map(type => {
-                const [label, methode, outil] = DETECTION[type];
-                return (
-                  <tr key={type}>
-                    <td>{label}</td><td>{methode}</td><td className="mono">{outil}</td>
-                    <td className="right">{occurrences(type)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Table>
-        </TableWrap>
-      </TabPanel>
+      {!resultat.extraction ? (
+        <p className="hint">Aucune donnée exploitable : le document n&apos;a pas été reconnu comme une pièce commerciale ou des comptes annuels.</p>
+      ) : (
+        <>
+          <Tabs
+            value={ongletActif} onChange={setOnglet}
+            items={[
+              { id: "donnees", label: "Données extraites" },
+              ...(tableaux.length ? [{ id: "tableaux", label: "Lignes et tableaux" }] : []),
+              { id: "json", label: "JSON strict" }
+            ]}
+          />
+
+          <TabPanel active={ongletActif === "donnees"}>
+            <div className="grid g-2">
+              {sections.map(s => (
+                <Section key={s.titre} section={s} corrections={doc.corrections} onCorriger={ouvrirCorrection} />
+              ))}
+            </div>
+            <p className="hint mt-s">
+              Seuls les champs renseignés sont affichés. « Calculé » : valeur déduite par le serveur
+              (ex. délai de règlement à partir de l&apos;échéance) ; le détail complet est dans l&apos;onglet JSON.
+            </p>
+          </TabPanel>
+
+          <TabPanel active={ongletActif === "tableaux"}>
+            {tableaux.map(t => <Tableau key={t.cle} tableau={t} />)}
+          </TabPanel>
+
+          <TabPanel active={ongletActif === "json"}>
+            <JsonStrict objet={resultat.extraction} />
+            <p className="hint">
+              Réponse du LLM validée par le schéma strict du back (Pydantic) avant le calcul des variables.
+            </p>
+          </TabPanel>
+        </>
+      )}
     </Card>
   );
 }

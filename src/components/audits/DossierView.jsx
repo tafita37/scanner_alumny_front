@@ -8,12 +8,13 @@ import Badge, { StatusBadge } from "@/components/ui/Badge";
 import { Spinner, Steps } from "@/components/ui/Misc";
 import RecapOnboarding from "@/components/audits/RecapOnboarding";
 import EtapeDocuments from "@/components/documents/EtapeDocuments";
+import EtapeQuestions from "@/components/questionnaire/EtapeQuestions";
 import EtapeCockpit from "@/components/cockpit/EtapeCockpit";
 import EtapeRapport from "@/components/rapports/EtapeRapport";
 import { useDossiers } from "@/context/DossiersContext";
 import { ETAPES_AUDIT, lienDossier } from "@/lib/dossiers";
 
-/* Page d'un dossier d'audit : les 4 étapes s'enchaînent ici.
+/* Page d'un dossier d'audit : les 5 étapes s'enchaînent ici.
    On peut revenir sur toute étape déjà atteinte, jamais sauter au-delà. */
 export default function DossierView({ refDossier, etapeDemandee }) {
   const router = useRouter();
@@ -76,11 +77,13 @@ export default function DossierView({ refDossier, etapeDemandee }) {
 
       {vue === 1 && <RecapOnboarding dossier={dossier} onSuivant={() => aller(2)} />}
 
-      {vue === 2 && <EtapeDocuments auditId={dossier.id} onSuivant={() => avancer(3, { statut: "analysé" })} />}
+      {vue === 2 && <EtapeDocuments auditId={dossier.id} onSuivant={() => avancer(3, { statut: "en cours d'analyse" })} />}
 
-      {vue === 3 && <EtapeCockpit dossier={dossier} onSuivant={() => avancer(4)} />}
+      {vue === 3 && <EtapeQuestions auditId={dossier.id} onSuivant={() => avancer(4, { statut: "analysé" })} />}
 
-      {vue === 4 && <EtapeRapport onGenere={() => majDossier(refDossier, { statut: "rapport généré" })} />}
+      {vue === 4 && <EtapeCockpit dossier={dossier} onSuivant={() => avancer(5)} onCompleter={() => aller(3)} />}
+
+      {vue === 5 && <EtapeRapport onGenere={() => majDossier(refDossier, { statut: "rapport généré" })} />}
     </PageShell>
   );
 }

@@ -1,40 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Card, { CardHead } from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import { CardHead } from "@/components/ui/Card";
 import Note from "@/components/ui/Note";
 import { IaSrc, IaTag } from "@/components/ui/Ia";
 import { Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
-import CockpitHero from "@/components/cockpit/CockpitHero";
-import { DetailCalcul, Indicateurs, ValeurTendancielle } from "@/components/cockpit/CockpitSections";
-import { CONTROLES_COCKPIT, MOTEURS } from "@/data/moteurs";
-import { SECTEURS } from "@/data/al";
+import CockpitHero, { Illustratif } from "@/components/cockpit/CockpitHero";
+import { Controles, DetailCalcul, DonneesEntree, Indicateurs } from "@/components/cockpit/CockpitSections";
+import { useCockpit } from "@/components/cockpit/useCockpit";
+import { MOTEURS } from "@/data/moteurs";
+import { SECTEUR_MOTEUR } from "@/lib/cockpit";
 import { useUi } from "@/context/UiContext";
 
-/* Étape 3 du dossier d'audit : résultats calculés par le moteur sectoriel.
-   onSuivant : résultats validés → génération du rapport */
-export default function EtapeCockpit({ dossier, onSuivant }) {
-  const [secteur, setSecteur] = useState(SECTEURS.includes(dossier.secteur) ? dossier.secteur : "BTP");
-  const [cle, setCle] = useState(0);            // force le rejeu des animations
+/* Étape 4 du dossier d'audit : résultats du moteur de calcul du secteur (GET …/cockpit/).
+   Score de santé, comparatif marché et leviers restent illustratifs tant qu'ils ne sont pas calculés.
+   onSuivant : résultats validés → génération du rapport · onCompleter : retour aux questions de l'agent */
+export default function EtapeCockpit({ dossier, onSuivant, onCompleter }) {
+  const { cockpit, encours, erreur, exemple, recharger } = useCockpit(dossier.id);
   const [leviersEnCours, setLeviersEnCours] = useState(false);
   const timer = useRef(null);
   const { toast, openModal, closeModal } = useUi();
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const moteur = MOTEURS[secteur];
-
-  const changerSecteur = valeur => {
-    setSecteur(valeur);
-    setCle(k => k + 1);
-    toast(`Moteur <b>${valeur}</b> chargé — indicateurs structurellement différents.`, "gold");
-  };
-
-  const recalculer = () => {
-    setCle(k => k + 1);
-    toast("Recalcul déclenché à partir des données d'entrée actuelles.", "ok");
-  };
+  const secteur = SECTEUR_MOTEUR[cockpit?.secteur]
+    ?? Object.values(SECTEUR_MOTEUR).find(s => s.toUpperCase() === dossier.secteur?.toUpperCase())
+    ?? "BTP";
+  const illustratif = MOTEURS[secteur];
+  const alertes = cockpit?.controles.filter(c => !c.ok).length ?? 0;
 
   const reproposerLeviers = () => {
     setLeviersEnCours(true);
@@ -48,11 +43,16 @@ export default function EtapeCockpit({ dossier, onSuivant }) {
     <>
       <h2>Valider les résultats</h2>
       <p>
-        Deux contrôles restent en alerte. La validation autorise la génération du rapport PDF ;
-        les résultats de calcul ne sont jamais saisis manuellement, seulement recalculés.
+        {alertes
+          ? `${alertes} contrôle${alertes > 1 ? "s restent" : " reste"} en alerte. `
+          : "Tous les contrôles sont au vert. "}
+        La validation autorise la génération du rapport PDF ; les résultats de calcul ne sont jamais saisis
+        manuellement, seulement recalculés.
       </p>
       <ModalActions>
-        <button className="btn btn-ghost" type="button" onClick={closeModal}>Revenir aux alertes</button>
+        <button className="btn btn-ghost" type="button" onClick={closeModal}>
+          {alertes ? "Revenir aux alertes" : "Annuler"}
+        </button>
         <button className="btn btn-gold" type="button" onClick={() => { closeModal(); onSuivant(); }}>
           Valider &amp; générer
         </button>
@@ -64,73 +64,81 @@ export default function EtapeCockpit({ dossier, onSuivant }) {
     <>
       <div className="row-between mb">
         <div className="row gap-s">
-          <select
-            className="select-auto" value={secteur} aria-label="Moteur sectoriel"
-            onChange={e => changerSecteur(e.target.value)}
-          >
-            {SECTEURS.map(s => <option key={s}>{s}</option>)}
-          </select>
-          <button className="btn btn-ghost btn-s" type="button" onClick={recalculer}>↻ Recalculer</button>
+          <Badge tone="sky">Moteur {secteur}</Badge>
+          <button className="btn btn-ghost btn-s" type="button" onClick={recharger} disabled={encours}>
+            ↻ Recalculer
+          </button>
         </div>
-        <button className="btn btn-gold" type="button" onClick={validerResultats}>Générer le rapport</button>
+        <button className="btn btn-gold" type="button" onClick={validerResultats} disabled={!cockpit}>
+          Générer le rapport
+        </button>
       </div>
 
       <Note tone="gold" ico="👁" className="mb">
         <b>Vue interne.</b> Ce cockpit n&apos;est jamais montré au client : il ne reçoit que le rapport PDF
-        généré à partir de ces résultats.
+        généré à partir de ces résultats. Les blocs marqués <b>illustratif</b> sont des exemples, pas encore calculés.
       </Note>
 
-      <CockpitHero moteur={moteur} secteur={`${secteur}-${cle}`} />
+      {exemple && (
+        <Note tone="bad" ico="⚠" className="mb">
+          <b>Données d&apos;exemple.</b> La route <code>GET /api/companies/audits/&lt;id&gt;/cockpit/</code> n&apos;existe
+          pas encore côté back : cette réponse fictive (affichée en développement seulement) montre le format attendu.
+        </Note>
+      )}
 
-      <ValeurTendancielle tend={moteur.tend} secteur={secteur} />
-      <Indicateurs indics={moteur.indics} secteur={secteur} />
-      <DetailCalcul calc={moteur.calc} />
+      {encours && !cockpit ? (
+        <div className="row muted"><Spinner /> Calcul du cockpit…</div>
+      ) : erreur ? (
+        <Note tone="bad" ico="⚠">
+          {erreur}{" "}
+          <button className="btn btn-ghost btn-s" type="button" onClick={recharger}>Réessayer</button>
+        </Note>
+      ) : cockpit && (
+        <div className={encours ? "is-loading" : undefined}>
+          <CockpitHero cockpit={cockpit} illustratif={illustratif} secteur={secteur} />
 
-      <section className="grid g-2 mt">
-        <div className="card ia-block">
-          <CardHead>
-            <h3>3 leviers d&apos;optimisation à 30 jours</h3>
-            <IaTag phase={0}>Agent de recommandation</IaTag>
-          </CardHead>
+          <DonneesEntree entrees={cockpit.entrees} secteur={secteur} onCompleter={onCompleter} />
+          <Indicateurs indicateurs={cockpit.indicateurs} entrees={cockpit.entrees} secteur={secteur} />
+          <DetailCalcul etapes={cockpit.etapes_calcul} />
 
-          <ol className="leviers">
-            {leviersEnCours ? (
-              <li className="muted"><Spinner /> recherche dans les playbooks consultants…</li>
-            ) : moteur.leviers.map(([titre, detail]) => (
-              <li key={titre}><b>{titre}</b><span>{detail}</span></li>
-            ))}
-          </ol>
+          <section className="grid g-2 mt">
+            <div className="card ia-block">
+              <CardHead>
+                <h3>3 leviers d&apos;optimisation à 30 jours</h3>
+                <IaTag phase={0}>Agent de recommandation</IaTag>
+                <Illustratif raison="Agent de recommandation pas encore construit" />
+              </CardHead>
 
-          <div className="row gap-s mt wrap">
-            <button className="btn btn-s btn-gold" type="button" onClick={reproposerLeviers}>
-              Proposer d&apos;autres leviers
-            </button>
-            <button
-              className="btn btn-ghost btn-s" type="button"
-              onClick={() => toast("Leviers validés — ils seront repris tels quels dans le rapport.", "ok")}
-            >
-              Valider pour le rapport
-            </button>
-          </div>
+              <ol className="leviers">
+                {leviersEnCours ? (
+                  <li className="muted"><Spinner /> recherche dans les playbooks consultants…</li>
+                ) : illustratif.leviers.map(([titre, detail]) => (
+                  <li key={titre}><b>{titre}</b><span>{detail}</span></li>
+                ))}
+              </ol>
 
-          <IaSrc>
-            RAG sur les playbooks rédigés par les consultants · validation humaine obligatoire avant intégration
-            au rapport
-          </IaSrc>
+              <div className="row gap-s mt wrap">
+                <button className="btn btn-s btn-gold" type="button" onClick={reproposerLeviers}>
+                  Proposer d&apos;autres leviers
+                </button>
+                <button
+                  className="btn btn-ghost btn-s" type="button"
+                  onClick={() => toast("Leviers validés — ils seront repris tels quels dans le rapport.", "ok")}
+                >
+                  Valider pour le rapport
+                </button>
+              </div>
+
+              <IaSrc>
+                RAG sur les playbooks rédigés par les consultants · validation humaine obligatoire avant intégration
+                au rapport
+              </IaSrc>
+            </div>
+
+            <Controles controles={cockpit.controles} onValider={validerResultats} />
+          </section>
         </div>
-
-        <Card tint="sky">
-          <CardHead><h3>Contrôles avant génération du rapport</h3></CardHead>
-          <ul className="checks">
-            {CONTROLES_COCKPIT.map(([ok, texte]) => (
-              <li className={ok ? undefined : "warn"} key={texte}>
-                <span className="ic">{ok ? "✓" : "!"}</span>{texte}
-              </li>
-            ))}
-          </ul>
-          <button className="btn mt" type="button" onClick={validerResultats}>Valider les résultats</button>
-        </Card>
-      </section>
+      )}
     </>
   );
 }
