@@ -1,17 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listerDocuments, supprimerDocument, uploaderDocuments } from "@/lib/api";
+import { extraireDocument, listerDocuments, supprimerDocument, uploaderDocuments } from "@/lib/api";
 import { heureCourante } from "@/lib/format";
 import {
-  SEUIL_CONFIANCE, devinerCategorie, estImage, etapesVierges, extraireDocument,
-  formatTaille, generateur, lectureNative, typeFichier, validerFichier
-} from "@/lib/extractionSimulee";
+  estPdf, etapesTerminees, etapesVierges, formatTaille, titreDocument, typeFichier, validerFichier
+} from "@/lib/extraction";
 
 let seq = 0;
 
+/* Durée minimale de la barre d'envoi, pour qu'elle reste lisible sur un petit fichier. */
+const DUREE_MIN_UPLOAD = 700;
+
 /* Les toasts sont rendus en HTML : on échappe les noms de fichiers. */
 const echapper = s => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
+const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
 /* Pause annulable : rejette avec une AbortError si le document est supprimé entre-temps. */
 function attendre(ms, signal) {
@@ -24,69 +28,48 @@ function attendre(ms, signal) {
   });
 }
 
-/* Patch d'état d'un document une fois son extraction (simulée) terminée. */
-function etatExtrait(res, image) {
-  return {
-    statut: "extrait",
-    mode: image ? "OCR" : "natif",
-    cat: res.categorie,
-    categorie: res.categorie,
-    numero: res.numero,
-    champs: res.champs,
-    entites: res.entites,
-    texte: res.texte,
-    ecartTotal: res.ecartTotal
-  };
-}
-
-const plurielChamps = n => `${n} champ${n > 1 ? "s" : ""}`;
-const msgCheck = faibles => (faibles ? `${plurielChamps(faibles)} sous le seuil` : "tous les champs conformes");
-
-/* Document déjà enregistré côté serveur (GET …/documents/). Pas encore d'extraction
-   persistée : on rejoue la simulation, déterministe, donc identique à celle du dépôt. */
+/* Document déjà enregistré côté serveur (GET …/documents/). La liste ne donne pas son extraction :
+   il repasse dans la file, et l'API renvoie directement la dernière extraction « ok »
+   (celles à vérifier ou jamais faites sont relancées). */
 function docDepuisServeur(row) {
   const type = typeFichier({ name: row.original_name });
   const mimeImage = type === "?" && row.mime_type?.startsWith("image/");
-  const image = estImage(type) || mimeImage;
-  const res = extraireDocument({ nom: row.original_name, taille: row.size, ocr: image, cat: devinerCategorie(row.original_name) });
-  const faibles = res.champs.filter(c => c.conf < SEUIL_CONFIANCE).length;
+  const pdf = estPdf(type, row.mime_type);
   return {
     id: `srv-${row.id}`,
     url: null,
     nom: row.original_name,
     type: mimeImage ? row.mime_type.slice(6).toUpperCase() : type,
+    pdf,
     octets: row.size,
     taille: formatTaille(row.size),
+    statut: pdf ? "attente" : "non_extractible",
     televerse: true,
     progression: 100,
     serveur: { id: row.id, nomStocke: row.stored_name, creeLe: row.created_at },
-    etapes: [
-      image ? { k: "natif", statut: "skip", msg: "aucune couche texte" } : { k: "natif", statut: "ok", msg: lectureNative(type, res.pages) },
-      image ? { k: "ocr", statut: "ok", msg: `vision locale · ${res.pages} p.` } : { k: "ocr", statut: "skip", msg: "non nécessaire" },
-      { k: "anon", statut: "ok", msg: `${Object.keys(res.entites).length} entités masquées` },
-      { k: "llm", statut: "ok", msg: `${plurielChamps(res.champs.length)} · schéma valide` },
-      { k: "check", statut: faibles ? "warn" : "ok", msg: msgCheck(faibles) }
-    ],
-    ...etatExtrait(res, image)
+    etapes: etapesVierges(),
+    resultat: null,
+    corrections: {}
   };
 }
 
 /* File de traitement des pièces déposées, un document à la fois, avec journal horodaté :
-   téléversement réel (POST /api/companies/documents/upload/) puis pipeline d'extraction
-   encore simulé, à remplacer par le suivi de job quand le back le proposera. */
-export function useExtractionDocuments({ auditId, moteur, toast }) {
+   téléversement (POST …/documents/upload/) puis extraction (POST …/documents/<id>/extract/).
+   statut : attente → upload → analyse → extrait | non_extractible | erreur.
+   Un document « extrait » porte la réponse de l'API dans `resultat` (status ok ou a_verifier). */
+export function useExtractionDocuments({ auditId, toast }) {
   const [docs, setDocs] = useState([]);
   const [journal, setJournal] = useState([]);
   const [actifId, setActifId] = useState(null);
   const [chargement, setChargement] = useState({ encours: Boolean(auditId), erreur: null });
   const [tentative, setTentative] = useState(0);
+  // Indicateurs de l'audit, recalculés par le back à chaque extraction (destinés au cockpit)
+  const [indicateurs, setIndicateurs] = useState(null);
   const controleur = useRef(null);
   const urls = useRef(new Map());
-  const moteurRef = useRef(moteur);
   const auditRef = useRef(auditId);
   const docsRef = useRef(docs);
 
-  useEffect(() => { moteurRef.current = moteur; }, [moteur]);
   useEffect(() => { auditRef.current = auditId; }, [auditId]);
   useEffect(() => { docsRef.current = docs; }, [docs]);
 
@@ -118,7 +101,9 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
         const existants = rows.filter(row => !connus.has(row.id)).map(docDepuisServeur);
         setDocs(list => [...existants, ...list]);
         setChargement({ encours: false, erreur: null });
-        if (existants.length) log(`${existants.length} document${existants.length > 1 ? "s" : ""} récupéré${existants.length > 1 ? "s" : ""} depuis le serveur`);
+        if (existants.length) {
+          log(`${pluriel(existants.length, "document")} récupéré${existants.length > 1 ? "s" : ""} depuis le serveur — reprise des extractions`);
+        }
       })
       .catch(e => {
         if (e.name === "AbortError") return;
@@ -140,19 +125,20 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
       }
       const id = `doc-${++seq}`;
       const url = URL.createObjectURL(file);
+      const type = typeFichier(file);
       urls.current.set(id, url);
       acceptes.push({
-        id, url, file,
+        id, url, file, type,
         nom: file.name,
-        type: typeFichier(file),
+        pdf: estPdf(type, file.type),
         octets: file.size,
         taille: formatTaille(file.size),
-        cat: devinerCategorie(file.name),
         statut: "attente",
         televerse: false,
         progression: 0,
         etapes: etapesVierges(),
-        champs: []
+        resultat: null,
+        corrections: {}
       });
     });
     if (!acceptes.length) return;
@@ -169,18 +155,16 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
     controleur.current = { id: doc.id, ctrl };
     setActifId(doc.id);
 
-    const pause = ms => attendre(ms, ctrl.signal);
-    const r = generateur(`${doc.id}|${Date.now()}`);
-    const etape = (k, statut, msg = "") =>
-      maj(doc.id, d => ({ etapes: d.etapes.map(e => (e.k === k ? { ...e, statut, msg } : e)) }));
-
+    // Toasts réservés aux actions de l'utilisateur : la reprise des pièces au chargement reste dans le journal.
+    const notifier = doc.file || doc.forcer ? toast : () => {};
+    let idServeur = doc.serveur?.id;
     let phase = "upload";
     try {
       if (!doc.televerse) {
         maj(doc.id, { statut: "upload", progression: 0, erreur: null });
         log(`Téléversement de ${doc.nom}…`);
         /* fetch ne remonte pas l'avancement de l'envoi : la barre progresse seule
-           jusqu'à 90 % puis se complète à la réponse (durée minimale pour rester lisible). */
+           jusqu'à 90 % puis se complète à la réponse. */
         const tic = setInterval(() => maj(doc.id, d => ({
           progression: Math.min(90, d.progression + Math.max(1, Math.round((90 - d.progression) / 6)))
         })), 150);
@@ -188,11 +172,12 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
         try {
           [[enregistre]] = await Promise.all([
             uploaderDocuments(auditRef.current, [doc.file], { signal: ctrl.signal }),
-            pause(r.entier(600, 1000))
+            attendre(DUREE_MIN_UPLOAD, ctrl.signal)
           ]);
         } finally {
           clearInterval(tic);
         }
+        idServeur = enregistre.id;
         maj(doc.id, {
           televerse: true,
           progression: 100,
@@ -202,67 +187,44 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
         });
         log(`${doc.nom} enregistré sur le serveur — document #${enregistre.id}`, "ok");
       }
+
+      if (!doc.pdf) {
+        maj(doc.id, { statut: "non_extractible" });
+        log(`${doc.nom} : conservé dans le dossier, l'extraction automatique est réservée aux PDF`, "gold");
+        return;
+      }
       phase = "analyse";
 
-      maj(doc.id, { statut: "analyse", etapes: etapesVierges(), erreur: null });
-      const image = estImage(doc.type);
-      const externe = moteurRef.current === "externe";
-      const res = extraireDocument({ nom: doc.nom, taille: doc.octets, ocr: image, cat: doc.cat });
+      maj(doc.id, { statut: "analyse", etapes: etapesVierges("run"), erreur: null });
+      log(`${doc.nom} : ${doc.forcer ? "relance de l'extraction" : "extraction"} sur le serveur…`);
+      const { indicateurs: nouveaux, ...resultat } = await extraireDocument(idServeur, { force: doc.forcer, signal: ctrl.signal });
 
-      /* 1. Couche texte native */
-      etape("natif", "run");
-      await pause(r.entier(500, 900));
-      if (doc.octets === 0) {
-        etape("natif", "err", "fichier vide");
-        throw new Error("fichier vide ou corrompu");
-      }
-      if (image) {
-        etape("natif", "skip", "aucune couche texte");
-        log(`${doc.nom} : image sans couche texte → bascule OCR`, "gold");
+      maj(doc.id, { statut: "extrait", forcer: false, etapes: etapesTerminees(resultat), resultat, corrections: {} });
+      setIndicateurs(nouveaux);
+      const titre = titreDocument(resultat);
+      if (resultat.status === "ok") {
+        log(`${doc.nom} extrait — ${titre}`, "ok");
+        notifier(`${echapper(doc.nom)} extrait — ${echapper(titre)}.`, "ok");
       } else {
-        etape("natif", "ok", lectureNative(doc.type, res.pages));
+        const points = resultat.errors.length ? ` (${pluriel(resultat.errors.length, "point")})` : "";
+        log(`${doc.nom} extrait — ${titre}, à vérifier${points}`, "gold");
+        notifier(`${echapper(doc.nom)} : extraction à vérifier${points}.`, "gold");
       }
-
-      /* 2. OCR / Vision LLM (images uniquement) */
-      if (image) {
-        etape("ocr", "run", externe ? "API externe" : "Qwen 2.5 VL local");
-        await pause(r.entier(1500, 2400));
-        etape("ocr", "ok", `${externe ? "API externe" : "vision locale"} · ${res.pages} p.`);
-      } else {
-        etape("ocr", "skip", "non nécessaire");
-      }
-
-      /* 3. Anonymisation */
-      etape("anon", "run");
-      await pause(r.entier(700, 1100));
-      const nbEntites = Object.keys(res.entites).length;
-      etape("anon", "ok", `${nbEntites} entités masquées`);
-      log(`${doc.nom} : ${nbEntites} entités personnelles remplacées par des jetons`);
-
-      /* 4. Extraction structurée */
-      etape("llm", "run");
-      if (!doc.cat) log(`Orchestrateur : ${doc.nom} classé en « ${res.categorie} »`, "gold");
-      await pause(r.entier(1000, 1700));
-      etape("llm", "ok", `${plurielChamps(res.champs.length)} · schéma valide`);
-
-      /* 5. Auto-évaluation */
-      etape("check", "run");
-      await pause(r.entier(600, 950));
-      const faibles = res.champs.filter(c => c.conf < SEUIL_CONFIANCE).length;
-      etape("check", faibles ? "warn" : "ok", msgCheck(faibles));
-
-      maj(doc.id, etatExtrait(res, image));
-      log(`${doc.nom} extrait — ${res.champs.length} champs${faibles ? `, ${faibles} à valider` : ""}`, faibles ? "gold" : "ok");
-      toast(
-        faibles
-          ? `Extraction terminée — ${faibles} champ${faibles > 1 ? "s" : ""} à valider manuellement.`
-          : `${echapper(doc.nom)} extrait — tous les champs sont conformes.`,
-        faibles ? "gold" : "ok"
-      );
     } catch (e) {
       if (e.name === "AbortError") return;
+      if (e.status === 415) {
+        maj(doc.id, { statut: "non_extractible", etapes: etapesVierges(), forcer: false });
+        log(`${doc.nom} : ${e.message}`, "gold");
+        return;
+      }
       const quoi = phase === "upload" ? "du téléversement" : "de l'extraction";
-      maj(doc.id, { statut: "erreur", erreur: e.message, progression: 0 });
+      maj(doc.id, {
+        statut: "erreur",
+        erreur: e.message,
+        forcer: false,
+        etapes: etapesVierges(),
+        ...(phase === "upload" ? { progression: 0 } : {})
+      });
       log(`${doc.nom} : échec ${quoi} — ${e.message}`, "bad");
       toast(`Échec ${quoi} de ${echapper(doc.nom)} : ${echapper(e.message)}`, "bad");
     } finally {
@@ -315,23 +277,21 @@ export function useExtractionDocuments({ auditId, moteur, toast }) {
     return true;
   }, [log, maj, toast]);
 
+  /* Relance forcée : sans ?force=true, l'API renverrait l'extraction « ok » déjà enregistrée. */
   const relancer = useCallback(id => {
     const d = docsRef.current.find(x => x.id === id);
-    if (!d || d.statut === "upload" || d.statut === "analyse") return;
+    if (!d || !["extrait", "erreur"].includes(d.statut)) return;
     log(`Relance du pipeline sur ${d.nom}`);
-    maj(id, { statut: "attente", etapes: etapesVierges(), erreur: null });
+    maj(id, { statut: "attente", etapes: etapesVierges(), erreur: null, forcer: true });
   }, [log, maj]);
 
-  const corriger = useCallback((id, k, valeur) => {
-    const nombre = Number(valeur.replace(/[^\d,.-]/g, "").replace(",", "."));
-    maj(id, d => ({
-      champs: d.champs.map(c => (c.k === k
-        ? { ...c, val: valeur, brut: typeof c.brut === "number" && Number.isFinite(nombre) && valeur.trim() ? nombre : valeur, conf: 1, corrige: true }
-        : c))
-    }));
+  /* Correction locale d'un champ (chemin : « pied.total_ht », « variables.delai_reglement_jours »…).
+     Pas encore d'API : elle n'est ni enregistrée ni reprise dans les indicateurs. */
+  const corriger = useCallback((id, chemin, valeur) => {
+    maj(id, d => ({ corrections: { ...d.corrections, [chemin]: valeur } }));
     const d = docsRef.current.find(x => x.id === id);
-    if (d) log(`Correction manuelle sur ${d.nom} — recalcul en cascade`, "ok");
+    if (d) log(`Correction locale sur ${d.nom} — non enregistrée sur le serveur`, "gold");
   }, [log, maj]);
 
-  return { docs, journal, actifId, chargement, recharger, ajouter, supprimer, relancer, corriger };
+  return { docs, journal, actifId, chargement, indicateurs, recharger, ajouter, supprimer, relancer, corriger };
 }

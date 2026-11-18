@@ -7,19 +7,19 @@ import Badge from "@/components/ui/Badge";
 import { Bar, Placeholder, Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import { useUi } from "@/context/UiContext";
-import { ACCEPT, ETAPES_PIPELINE, FORMATS_ACCEPTES, apercuIframe, apercuImage } from "@/lib/extractionSimulee";
+import { ACCEPT, FORMATS_ACCEPTES, apercuIframe, apercuImage, categorieDoc, titreDocument } from "@/lib/extraction";
 
-/* Libellé, teinte du badge et avancement global (0-100) d'un document. */
+/* Libellé, teinte du badge et avancement global (0-100) d'un document.
+   L'extraction est un seul appel : pas d'avancement par étape pendant l'analyse. */
 function suivi(d) {
   if (d.statut === "attente") return { label: "en file d'attente", tone: "ink", pct: 0 };
   if (d.statut === "upload") return { label: `téléversement ${d.progression} %`, tone: "sky", pct: d.progression * 0.3 };
-  if (d.statut === "analyse") {
-    const faites = d.etapes.filter(e => e.statut !== "attente" && e.statut !== "run").length;
-    const n = Math.min(faites + 1, ETAPES_PIPELINE.length);
-    return { label: `analyse · étape ${n}/${ETAPES_PIPELINE.length}`, tone: "warn", pct: 30 + faites / ETAPES_PIPELINE.length * 70 };
-  }
+  if (d.statut === "analyse") return { label: "analyse en cours", tone: "warn", pct: 65 };
   if (d.statut === "erreur") return { label: "échec", tone: "bad", pct: 100 };
-  return { label: `extrait (${d.mode})`, tone: d.mode === "OCR" ? "gold" : "ok", pct: 100 };
+  if (d.statut === "non_extractible") return { label: "déposé · non extrait", tone: "ink", pct: 100 };
+  return d.resultat.status === "ok"
+    ? { label: "extrait", tone: "ok", pct: 100 }
+    : { label: "à vérifier", tone: "gold", pct: 100 };
 }
 
 export default function DepotPieces({ docs, chargement, onRecharger, selection, onSelection, onAjouter, onSupprimer, onRelancer }) {
@@ -72,8 +72,10 @@ export default function DepotPieces({ docs, chargement, onRecharger, selection, 
       )}
       <p className="hint mt-s">
         {d.statut === "extrait"
-          ? <>{d.champs.length} champs extraits · {d.categorie} n°{d.numero}</>
-          : "Extraction pas encore disponible pour ce document."}
+          ? titreDocument(d.resultat)
+          : d.statut === "non_extractible"
+            ? "Format conservé dans le dossier : seuls les PDF sont extraits automatiquement."
+            : "Extraction pas encore disponible pour ce document."}
       </p>
       <ModalActions><button className="btn" type="button" onClick={closeModal}>Fermer</button></ModalActions>
     </>
@@ -107,7 +109,7 @@ export default function DepotPieces({ docs, chargement, onRecharger, selection, 
       >
         <div className="drop-ico">⇪</div>
         <b>Dépose devis, factures et bilan comptable</b>
-        <span className="small muted">{FORMATS_ACCEPTES} — 20 Mo max par fichier</span>
+        <span className="small muted">{FORMATS_ACCEPTES} — 20 Mo max par fichier · extraction automatique des PDF</span>
         <span className="btn btn-soft btn-s mt-s">Parcourir les fichiers</span>
         <input
           ref={input}
@@ -151,7 +153,7 @@ export default function DepotPieces({ docs, chargement, onRecharger, selection, 
                 <span className="grow">
                   <span className="file-nom">{d.nom}</span><br />
                   <span className="file-meta">
-                    {d.cat || "à classer"} · {d.taille}
+                    {categorieDoc(d)} · {d.taille}
                     {d.serveur && <> · <span title={`Stocké sous ${d.serveur.nomStocke}`}>#{d.serveur.id}</span></>}
                     {d.statut === "erreur" && <> · <span className="txt-bad">{d.erreur}</span></>}
                   </span>

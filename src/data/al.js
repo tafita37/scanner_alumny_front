@@ -75,16 +75,16 @@ export const IA_MAP = [
   }
 ];
 
-/* etape : étape d'audit la plus avancée atteinte (1 onboarding → 4 rapport, cf. ETAPES_AUDIT) */
+/* etape : étape d'audit la plus avancée atteinte (1 onboarding → 5 rapport, cf. ETAPES_AUDIT) */
 export const DOSSIERS = [
-  { ref: "D-2026-041", etape: 4, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "analysé", maj: "12/08/2026", consultant: "Tafita A.", score: 68, fuite: 47800 },
+  { ref: "D-2026-041", etape: 5, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "analysé", maj: "12/08/2026", consultant: "Tafita A.", score: 68, fuite: 47800 },
   { ref: "D-2026-040", etape: 2, client: "Néo Conseil", siret: "903 118 220 00017", secteur: "Services", statut: "en cours d'analyse", maj: "12/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
   { ref: "D-2026-039", etape: 2, client: "Métal Ouest", siret: "441 903 552 00038", secteur: "Industrie", statut: "documents en attente", maj: "11/08/2026", consultant: "Tafita A.", score: null, fuite: null },
-  { ref: "D-2026-038", etape: 4, client: "Toiture & Fils", siret: "789 220 114 00011", secteur: "BTP", statut: "rapport généré", maj: "09/08/2026", consultant: "Tafita A.", score: 54, fuite: 71200 },
-  { ref: "D-2026-037", etape: 4, client: "Studio Lompré", siret: "552 771 003 00029", secteur: "Services", statut: "rapport généré", maj: "05/08/2026", consultant: "Ny Aina R.", score: 81, fuite: 18400 },
+  { ref: "D-2026-038", etape: 5, client: "Toiture & Fils", siret: "789 220 114 00011", secteur: "BTP", statut: "rapport généré", maj: "09/08/2026", consultant: "Tafita A.", score: 54, fuite: 71200 },
+  { ref: "D-2026-037", etape: 5, client: "Studio Lompré", siret: "552 771 003 00029", secteur: "Services", statut: "rapport généré", maj: "05/08/2026", consultant: "Ny Aina R.", score: 81, fuite: 18400 },
   { ref: "D-2026-036", etape: 1, client: "Charpente Vallée", siret: "331 887 664 00042", secteur: "BTP", statut: "brouillon", maj: "04/08/2026", consultant: "Ny Aina R.", score: null, fuite: null },
-  { ref: "D-2026-035", etape: 4, client: "Plasturgie Rhône", siret: "220 449 118 00050", secteur: "Industrie", statut: "archivé", maj: "22/07/2026", consultant: "Tafita A.", score: 62, fuite: 96500 },
-  { ref: "D-2026-034", etape: 4, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "archivé", maj: "14/02/2026", consultant: "Ny Aina R.", score: 51, fuite: 63900 }
+  { ref: "D-2026-035", etape: 5, client: "Plasturgie Rhône", siret: "220 449 118 00050", secteur: "Industrie", statut: "archivé", maj: "22/07/2026", consultant: "Tafita A.", score: 62, fuite: 96500 },
+  { ref: "D-2026-034", etape: 5, client: "Bâti Duran SARL", siret: "812 456 789 00023", secteur: "BTP", statut: "archivé", maj: "14/02/2026", consultant: "Ny Aina R.", score: 51, fuite: 63900 }
 ];
 
 export const CLIENTS = [

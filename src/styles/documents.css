@@ -129,12 +129,6 @@ code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background:
 .json .k { color: var(--blue-2); }
 .json .v { color: var(--gold); }
 
-tr.low { background: var(--warn-bg); }
-tr.low:hover { background: #f8e9d2; }
-.conf { display: inline-flex; align-items: center; gap: 6px; }
-.conf-bar { width: 44px; height: 6px; border-radius: 99px; background: #e4e9f3; overflow: hidden; }
-.conf-bar i { display: block; height: 100%; background: var(--ok); }
-.conf-bar.low i { background: var(--warn); }
 
 /* Complétude */
 .complet-row { display: flex; align-items: center; gap: 9px; font-size: 13px; }

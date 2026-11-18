@@ -238,10 +238,77 @@ export function supprimerDocument(documentId) {
   return apiFetch(`/api/companies/documents/${encodeURIComponent(documentId)}/delete/`, { method: "DELETE" });
 }
 
+/* POST /api/companies/documents/<document_id>/extract/[?force=true] → lecture du PDF, anonymisation,
+   structuration par le LLM et contrôles. Si la dernière extraction est « ok », elle est renvoyée
+   telle quelle ; force la relance quand même.
+   → { id, document_id, extraction_date, status: "ok" | "a_verifier", attempts, input_tokens, output_tokens,
+       errors: [str], extraction: {…} | null, variables: {…} | null,
+       indicateurs: { documents_pris_en_compte, documents_a_verifier, chiffre_affaires, resultat_net, effectif,
+                      documents_commerciaux, comptes_annuels } }
+   415 si ce n'est pas un PDF, 422 si le PDF est illisible ou le secteur non pris en charge, 500 si la conversion échoue. */
+export function extraireDocument(documentId, { force = false, signal } = {}) {
+  const query = force ? "?force=true" : "";
+  return apiFetch(`/api/companies/documents/${encodeURIComponent(documentId)}/extract/${query}`, { method: "POST", signal });
+}
+
 /* POST /api/companies/audits/<audit_id>/documents/upload/ (multipart : `files` répété une fois par fichier)
    → [{ id, original_name, stored_name, size, mime_type, created_at, audit_id }] */
 export function uploaderDocuments(auditId, files, { signal } = {}) {
   const body = new FormData();
   Array.from(files).forEach(f => body.append("files", f));
   return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/documents/upload/`, { method: "POST", body, signal });
+}
+
+/* ------------------------------------------------------------
+   Questionnaire adaptatif : tours de questions générés par l'agent IA
+   Question : { id, display_order, label, rationale,
+                answer_type: "montant" | "pourcentage" | "nombre" | "date" | "oui_non" | "choix" | "texte",
+                choices: [str] | null, unit: str | null, document_ids: [int],
+                suggested_answer, suggested_answer_source: str | null,
+                status: "en_attente" | "repondue" | "ignoree", answer }
+   Tour : { id, round_number, status: "en_cours" | "ok" | "erreur", analysis, input_tokens, output_tokens, questions }
+   ------------------------------------------------------------ */
+
+/* GET /api/companies/audits/<audit_id>/questionnaires/ → { finished, questionnaires: [tour] },
+   tous les tours (y compris en erreur, sans question), du premier au dernier. 404 si l'audit n'existe pas. */
+export function listerQuestionnaires(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/questionnaires/`, { signal });
+}
+
+/* POST /api/companies/audits/<audit_id>/questionnaires/generate/ → génère le tour suivant (jusqu'à ~2 min).
+   → { ...tour, finished, errors: [str], tool_calls: [{ tool, arguments }] }
+   status « erreur » : relancer la même route reprend ce tour.
+   409 : aucun document extrait, tour déjà en cours, questions du dernier tour en attente, questionnaire terminé. */
+export function genererQuestionnaire(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/questionnaires/generate/`, { method: "POST", signal });
+}
+
+/* PATCH /api/companies/questions/<id>/answer/ → la question mise à jour.
+   body : { status: "repondue", answer } | { status: "ignoree" } | { status: "en_attente" }
+   400 si la réponse ne correspond pas au type ; 409 si le tour suivant a déjà été généré. */
+export function repondreQuestion(questionId, body) {
+  return apiFetch(`/api/companies/questions/${encodeURIComponent(questionId)}/answer/`, { method: "PATCH", body });
+}
+
+/* ------------------------------------------------------------
+   Cockpit : moteur de calcul sectoriel (Module 3), calculé à chaque appel, sans LLM
+   ------------------------------------------------------------ */
+
+/* GET /api/companies/audits/<audit_id>/cockpit/ →
+   { secteur: "BTP" | "SERVICES" | "INDUSTRIE",
+     entrees: [{ cle, label, valeur: number | null, unite: str | null,
+                 source: "comptes_annuels" | "api" | "documents" | "questionnaire" | "parametre" | null,
+                 detail: str | null, statut: "ok" | "manquant" | "non_defini" }],
+     indicateurs: [{ cle, nom, valeur: number | null, unite, formule, pivot: bool, comparaison: str | null,
+                     manquants: [cle d'entrée], statut: "ok" | "manquant" | "non_defini" }],
+     etapes_calcul: [{ libelle, equation, resultat: number | null, unite }],
+     perte_annuelle: { valeur: number | null, partielle: bool,
+                       composantes: [{ cle, label, valeur: number | null, manquants: [cle], statut }] },
+     score_sante: number | null,
+     controles: [{ ok: bool, texte }] }
+   statut : « manquant » = donnée absente (à obtenir par le questionnaire ou un document) ;
+            « non_defini » = méthode de calcul pas encore définie.
+   Unités : pourcentages en points (20 = 20 %). 404 { detail } si l'audit n'existe pas. */
+export function getCockpit(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/cockpit/`, { signal });
 }

@@ -14,6 +14,13 @@ export function groupe(n) {
   return (neg ? "−" + ESPACE : "") + out;
 }
 
+/* 19094.94 → « 19 094,94 » : décimales fixes, milliers groupés comme groupe() */
+export function decimal(n, decimales = 2) {
+  const [entier, frac] = Math.abs(n).toFixed(decimales).split(".");
+  const neg = n < 0 && Number(`${entier}.${frac || 0}`) !== 0;
+  return (neg ? "−" + ESPACE : "") + entier.replace(/\B(?=(\d{3})+(?!\d))/g, ESPACE) + (frac ? "," + frac : "");
+}
+
 export const fmtEur = n => (n === null || n === undefined) ? "—" : groupe(n) + ESPACE + "€";
 
 /* Initiales d'une raison sociale : « Bâti Duran SARL » → « BD » */
@@ -36,4 +43,10 @@ export const nomDirigeant = entreprise =>
 export function enNombre(valeur) {
   const s = String(valeur ?? "").replace(/[\s €]/g, "").replace(/−/g, "-").replace(",", ".");
   return s === "" ? null : Number(s);
+}
+
+/* 2400 → « 2 400 », 12.5 → « 12,5 », 29.054 → « 29,05 » : décimales seulement si utiles */
+export function nombre(n) {
+  if (Number.isInteger(n)) return decimal(n, 0);
+  return decimal(n, 2).replace(/,?0+$/, "");
 }

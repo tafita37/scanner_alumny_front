@@ -2,15 +2,8 @@
 
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import Chip from "@/components/ui/Chip";
 import { Bar, Divider, Spinner } from "@/components/ui/Misc";
-import { useUi } from "@/context/UiContext";
-import { ETAPES_PIPELINE } from "@/lib/extractionSimulee";
-
-const HINTS = {
-  local: "Auto-hébergé, ~8-12 Go de VRAM. Aucune donnée ne quitte l'infrastructure Alumny ; fiabilité légèrement inférieure sur les documents très dégradés.",
-  externe: "Meilleure qualité sur écriture manuscrite et photos dégradées, mais l'image brute part chez un tiers : exige une anonymisation en amont ou un DPA / Zero Data Retention."
-};
+import { ETAPES_PIPELINE, categorieDoc } from "@/lib/extraction";
 
 const CLASSES = { run: "is-run", ok: "is-ok", skip: "is-skip", warn: "is-warn", err: "is-err" };
 
@@ -20,19 +13,17 @@ function badgeEtat(doc, enFile) {
   if (doc.statut === "analyse") return <Badge tone="warn">en cours</Badge>;
   if (doc.statut === "attente") return <Badge tone="ink">en file</Badge>;
   if (doc.statut === "erreur") return <Badge tone="bad">échec</Badge>;
-  return <Badge tone="ok">{enFile ? `terminé · ${enFile} en file` : "terminé"}</Badge>;
+  if (doc.statut === "non_extractible") return <Badge tone="ink">non extractible</Badge>;
+  const suite = enFile ? ` · ${enFile} en file` : "";
+  return doc.resultat.status === "ok"
+    ? <Badge tone="ok">terminé{suite}</Badge>
+    : <Badge tone="gold">à vérifier{suite}</Badge>;
 }
 
 /* doc : document suivi (celui en cours de traitement, sinon celui sélectionné)
    journal : [{ id, heure, texte, ton }] du plus récent au plus ancien */
-export default function PipelineExtraction({ doc, enFile, journal, moteur, onMoteur, onRelancer }) {
-  const { toast } = useUi();
-  const occupe = doc && (doc.statut === "upload" || doc.statut === "analyse" || doc.statut === "attente");
-
-  const choisirMoteur = m => {
-    onMoteur(m);
-    if (m === "externe") toast("Attention : garanties contractuelles requises (DPA / Zero Data Retention).", "gold");
-  };
+export default function PipelineExtraction({ doc, enFile, journal, onRelancer }) {
+  const relancable = doc && (doc.statut === "extrait" || doc.statut === "erreur");
 
   return (
     <Card>
@@ -49,7 +40,7 @@ export default function PipelineExtraction({ doc, enFile, journal, moteur, onMot
             <span className="file-meta">
               {doc.statut === "upload"
                 ? `envoi du fichier — ${doc.progression} %`
-                : `${doc.cat || "catégorie à déterminer"} · ${doc.taille}`}
+                : `${categorieDoc(doc)} · ${doc.taille}`}
             </span>
             {doc.statut === "upload" && <Bar value={doc.progression} tint="sky" className="file-bar" />}
           </span>
@@ -57,6 +48,8 @@ export default function PipelineExtraction({ doc, enFile, journal, moteur, onMot
       ) : (
         <p className="hint mb">Dépose une pièce pour suivre son traitement étape par étape.</p>
       )}
+
+      {doc?.statut === "erreur" && <p className="small txt-bad mb">{doc.erreur}</p>}
 
       <ol className="pipe">
         {ETAPES_PIPELINE.map((e, i) => {
@@ -68,7 +61,7 @@ export default function PipelineExtraction({ doc, enFile, journal, moteur, onMot
                 <b>{e.titre}</b>
                 <span>
                   {e.k === "llm"
-                    ? <>schéma imposé, <code>null</code> plutôt qu&apos;une valeur hallucinée</>
+                    ? <>LLM via l&apos;API Groq, schéma imposé selon le secteur, <code>null</code> plutôt qu&apos;une valeur inventée</>
                     : e.desc}
                 </span>
               </div>
@@ -97,19 +90,14 @@ export default function PipelineExtraction({ doc, enFile, journal, moteur, onMot
       <Divider />
 
       <div className="row wrap row-between" style={{ gap: 14 }}>
-        <div>
-          <span className="lbl">Moteur d&apos;extraction</span>
-          <div className="row gap-s mt-s wrap">
-            <Chip active={moteur === "local"} onClick={() => choisirMoteur("local")}>Vision LLM local (RGPD ✓)</Chip>
-            <Chip active={moteur === "externe"} onClick={() => choisirMoteur("externe")}>API externe (qualité +)</Chip>
-          </div>
-        </div>
-        <button className="btn btn-ghost btn-s" type="button" disabled={!doc || occupe} onClick={() => onRelancer(doc.id)}>
+        <p className="hint grow" style={{ margin: 0 }}>
+          Lecture, OCR et anonymisation tournent sur le serveur Alumny : seul le texte anonymisé est envoyé
+          au LLM, et les vraies valeurs sont remises dans le résultat au retour.
+        </p>
+        <button className="btn btn-ghost btn-s" type="button" disabled={!relancable} onClick={() => onRelancer(doc.id)}>
           Relancer le pipeline
         </button>
       </div>
-
-      <p className="hint mt-s">{HINTS[moteur]}</p>
     </Card>
   );
 }
