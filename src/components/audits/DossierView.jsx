@@ -83,7 +83,17 @@ export default function DossierView({ refDossier, etapeDemandee }) {
 
       {vue === 4 && <EtapeCockpit dossier={dossier} onSuivant={() => avancer(5)} onCompleter={() => aller(3)} />}
 
-      {vue === 5 && <EtapeRapport onGenere={() => majDossier(refDossier, { statut: "rapport généré" })} />}
+      {vue === 5 && (
+        <EtapeRapport
+          auditId={dossier.id}
+          client={dossier.client}
+          onGenere={() => {
+            majDossier(refDossier, { statut: "rapport généré" });
+            recharger(); // remaining_step passé à 0 par le back : l'audit sort des « en cours »
+          }}
+          onQuestions={() => aller(3)}
+        />
+      )}
     </PageShell>
   );
 }
