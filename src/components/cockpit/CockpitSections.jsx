@@ -2,13 +2,17 @@
 
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { SOURCES, STATUTS, libellesManquants, valeurAvecUnite } from "@/lib/cockpit";
+import { Table, TableWrap } from "@/components/ui/Misc";
+import {
+  COLONNES_LIGNES, SOURCES, aFournirParDocument, libellesManquants, statutEntree, valeurAvecUnite
+} from "@/lib/cockpit";
 
 /* Données d'entrée du moteur, chacune avec sa source ; celles qui manquent sont signalées.
-   onCompleter : ouvre l'étape des questions de l'agent */
-export function DonneesEntree({ entrees, secteur, onCompleter }) {
+   onCompleter : ouvre l'étape des questions de l'agent · onDocuments : ouvre le dépôt de pièces */
+export function DonneesEntree({ entrees, secteur, onCompleter, onDocuments }) {
   const renseignees = entrees.filter(e => e.statut === "ok").length;
-  const aCompleter = entrees.filter(e => e.statut === "manquant").length;
+  const aDemander = entrees.filter(e => e.statut === "manquant" && !aFournirParDocument(e));
+  const aFournir = entrees.filter(aFournirParDocument);
 
   return (
     <Card className="mt">
@@ -24,7 +28,7 @@ export function DonneesEntree({ entrees, secteur, onCompleter }) {
         <div className="tend">
           {entrees.map(e => {
             const source = SOURCES[e.source];
-            const statut = STATUTS[e.statut];
+            const statut = statutEntree(e);
             return (
               <div className={"tend-cell" + (e.statut === "ok" ? "" : ` is-${e.statut}`)} key={e.cle}>
                 <div className="tend-k">{e.label}</div>
@@ -43,16 +47,89 @@ export function DonneesEntree({ entrees, secteur, onCompleter }) {
         <p className="muted small">Aucune donnée d&apos;entrée renvoyée par le moteur.</p>
       )}
 
-      {aCompleter > 0 && onCompleter && (
+      {aDemander.length > 0 && onCompleter && (
         <div className="row-between mt">
           <span className="hint">
-            {aCompleter} donnée{aCompleter > 1 ? "s" : ""} à obtenir du dirigeant : l&apos;agent peut la poser dans son questionnaire.
+            À demander au dirigeant : {aDemander.map(e => e.label).join(", ")}.
           </span>
           <button className="btn btn-soft btn-s" type="button" onClick={onCompleter}>
             Compléter via les questions de l&apos;agent →
           </button>
         </div>
       )}
+      {aFournir.length > 0 && onDocuments && (
+        <div className="row-between mt">
+          <span className="hint">
+            Seul un document peut fournir : {aFournir.map(e => e.label).join(", ")}.
+          </span>
+          <button className="btn btn-ghost btn-s" type="button" onClick={onDocuments}>
+            Ajouter des documents →
+          </button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/* Détail ligne à ligne d'une entrée agrégée (ex. marge sur coûts variables par produit). */
+export function DetailLignes({ entree }) {
+  const lignes = entree.lignes ?? [];
+  const cles = [...new Set(lignes.flatMap(l => Object.keys(l)))];
+  const colonnes = [
+    ...Object.keys(COLONNES_LIGNES).filter(c => cles.includes(c)),
+    ...cles.filter(c => !COLONNES_LIGNES[c])
+  ];
+  /* Le total s'aligne sous la marge totale, sinon dans la dernière colonne */
+  const colTotal = colonnes.includes("marge_totale") ? "marge_totale" : colonnes.at(-1);
+  const cellule = (col, v) => {
+    if (v === null || v === undefined || v === "") return "—";
+    const def = COLONNES_LIGNES[col];
+    if (typeof v === "number") return valeurAvecUnite(v, def?.unite);
+    return String(v);
+  };
+
+  return (
+    <Card className="mt">
+      <CardHead>
+        <h2>Détail — {entree.label}</h2>
+        <Badge tone="sky">{lignes.length} ligne{lignes.length > 1 ? "s" : ""}</Badge>
+      </CardHead>
+      {entree.detail && <p className="hint" style={{ margin: "-8px 0 12px" }}>{entree.detail}</p>}
+      <TableWrap>
+        <Table>
+          <thead>
+            <tr>
+              {colonnes.map(c => (
+                <th key={c} className={COLONNES_LIGNES[c]?.num ? "right" : undefined}>{COLONNES_LIGNES[c]?.label ?? c}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lignes.map((l, i) => (
+              <tr key={i} className={l.marge_totale === null || l.marge_totale === undefined ? "is-off" : undefined}>
+                {colonnes.map(c => (
+                  <td key={c} className={COLONNES_LIGNES[c]?.num || typeof l[c] === "number" ? "right nowrap" : undefined}>
+                    {cellule(c, l[c])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          {typeof entree.valeur === "number" && (
+            <tfoot>
+              <tr>
+                {colonnes.map((c, i) => (
+                  <td key={c} className={c === colTotal ? "right nowrap" : undefined}>
+                    {c === colTotal
+                      ? <b>{valeurAvecUnite(entree.valeur, entree.unite)}</b>
+                      : i === 0 && <b>Total retenu</b>}
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
+        </Table>
+      </TableWrap>
     </Card>
   );
 }

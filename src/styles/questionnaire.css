@@ -67,3 +67,5 @@
 @media (max-width: 640px) {
   .qa-body { padding-left: 0; }
 }
+
+.qa-var { font-size: 11.5px; color: #8d6222; margin: 6px 0 0; }

@@ -96,7 +96,8 @@ function TourPrecedent({ tour }) {
 export default function EtapeQuestions({ auditId, onSuivant }) {
   const { toast, openModal, closeModal } = useUi();
   const {
-    tours, termine, chargement, generation, enCoursAilleurs, enquetes, documents, envois, recharger, generer, repondre
+    tours, termine, chargement, generation, enCoursAilleurs, enquetes, documents, entreesCockpit, envois,
+    recharger, generer, repondre
   } = useQuestionnaire({ auditId, toast });
 
   const toursOk = tours.filter(t => t.status === "ok");
@@ -111,8 +112,18 @@ export default function EtapeQuestions({ auditId, onSuivant }) {
   const enErreur = !enCours && !termine && (dernier?.status === "erreur" || Boolean(generation.erreur));
   /* Réponses figées dès qu'un tour suivant est en cours ou généré (un tour en erreur ne compte pas) */
   const verrouille = enCours || (dernier !== courant && dernier?.status !== "erreur");
-  const peutValider =Boolean(courant) && c.en_attente === 0 && !enCours && !termine && dernier === courant && !generation.erreur;
+  const peutValider = Boolean(courant) && c.en_attente === 0 && !enCours && !termine && dernier === courant && !generation.erreur;
   const prochainNumero = (dernierOk?.round_number ?? 0) + 1;
+
+  /* Libellé de l'entrée du cockpit qu'alimente une question (champ `variable`) */
+  const libelles = Object.fromEntries(entreesCockpit.map(e => [e.cle, e.label]));
+  const libelleVariable = q => (q.variable ? libelles[q.variable] ?? q.variable : null);
+
+  /* Tour vide alors que le questionnaire n'est pas terminé : il reste des entrées du cockpit jamais demandées
+     (même règle que le back : manquantes, demandables, absentes des tours précédents). */
+  const supplementaire = Boolean(dernierOk) && !dernierOk.questions.length && !termine && !enCours && !enErreur;
+  const demandees = new Set(toursOk.flatMap(t => t.questions.map(q => q.variable)).filter(Boolean));
+  const restantes = entreesCockpit.filter(e => e.statut === "manquant" && e.demandable !== false && !demandees.has(e.cle));
 
   const passerAuCockpit = () => {
     if (termine) {
@@ -186,6 +197,29 @@ export default function EtapeQuestions({ auditId, onSuivant }) {
             </Note>
           )}
 
+          {supplementaire && (
+            <IaBlock>
+              <CardHead>
+                <h3>Il manque encore des données au cockpit</h3>
+                <Badge tone="warn" dot>tour supplémentaire possible</Badge>
+              </CardHead>
+              <p className="small">
+                L&apos;agent n&apos;a plus de question sur les documents
+                {restantes.length
+                  ? <>, mais le moteur de calcul attend encore : <b>{restantes.map(e => e.label).join(", ")}</b>.</>
+                  : ", mais le moteur de calcul attend encore des données du dirigeant."}{" "}
+                Un tour supplémentaire peut les lui demander.
+              </p>
+              {dernierOk.analysis && <div className="ia-out mt-s qn-analysis">{dernierOk.analysis}</div>}
+              <Enquete appels={enquetes[dernierOk.id]} />
+              <div className="row-end mt">
+                <button className="btn btn-gold" type="button" onClick={generer}>
+                  Générer un tour supplémentaire →
+                </button>
+              </div>
+            </IaBlock>
+          )}
+
           {termine && (
             <IaBlock>
               <CardHead>
@@ -223,6 +257,7 @@ export default function EtapeQuestions({ auditId, onSuivant }) {
                     key={q.id}
                     q={q}
                     numero={i + 1}
+                    variable={libelleVariable(q)}
                     verrouillee={verrouille}
                     documents={documents}
                     envoi={Boolean(envois[q.id])}

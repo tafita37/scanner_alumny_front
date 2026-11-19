@@ -53,9 +53,10 @@ function Saisie({ q, valeur, onChange, onValider, disabled, id }) {
 }
 
 /* Une question de l'agent : proposition éventuelle, saisie, réponse enregistrée.
+   variable : libellé de l'entrée du cockpit qu'alimente la réponse (null si aucune)
    verrouillee : le tour suivant a été généré, la réponse ne peut plus changer.
    onRepondre(body) → Promise<message d'erreur | null> */
-export default function QuestionAgent({ q, numero, verrouillee, documents, envoi, onRepondre }) {
+export default function QuestionAgent({ q, numero, variable, verrouillee, documents, envoi, onRepondre }) {
   const [edition, setEdition] = useState(q.status === "en_attente");
   const [saisie, setSaisie] = useState(() => versSaisie(q, q.answer));
   const [erreur, setErreur] = useState(null);
@@ -102,6 +103,7 @@ export default function QuestionAgent({ q, numero, verrouillee, documents, envoi
         <div className="grow">
           <h3 className="qa-label">{q.label}</h3>
           {q.rationale && <p className="qa-why">{q.rationale}</p>}
+          {variable && <p className="qa-var">◈ alimente le cockpit : <b>{variable}</b></p>}
           {docs.length > 0 && (
             <p className="qa-docs">
               {docs.map((nom, i) => <span key={q.document_ids[i]} title={nom}>📄 {nom}</span>)}
