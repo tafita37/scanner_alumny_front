@@ -47,8 +47,10 @@ function messageErreur(data, status) {
   return MESSAGE_INATTENDU;
 }
 
-/* Requête HTTP brute, sans aucune gestion de session */
-async function requete(chemin, { method = "GET", body, token, headers = {}, signal } = {}) {
+/* Requête HTTP brute, sans aucune gestion de session.
+   format : "json" (défaut) ou "blob" (fichier : le corps d'une réponse réussie est renvoyé en Blob,
+   une erreur reste lue en JSON). */
+async function requete(chemin, { method = "GET", body, token, headers = {}, signal, format = "json" } = {}) {
   /* FormData (upload de fichiers) : envoyé tel quel, le navigateur pose lui-même
      le Content-Type multipart avec sa frontière. */
   const multipart = typeof FormData !== "undefined" && body instanceof FormData;
@@ -71,6 +73,7 @@ async function requete(chemin, { method = "GET", body, token, headers = {}, sign
     throw new ApiError("Impossible de joindre le serveur. Vérifiez votre connexion.");
   }
 
+  if (format === "blob" && reponse.ok) return reponse.blob();
   const data = await reponse.json().catch(() => null);
   if (!reponse.ok) throw new ApiError(messageErreur(data, reponse.status), reponse.status, data);
   return data;
@@ -317,4 +320,43 @@ export function repondreQuestion(questionId, body) {
    404 { detail } si l'audit n'existe pas ; 422 { detail } si son secteur n'a pas de moteur de calcul. */
 export function getCockpit(auditId, { signal } = {}) {
   return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/cockpit/`, { signal });
+}
+
+/* ------------------------------------------------------------
+   Rapport PDF remis au client (Module 4) : une seule version par audit,
+   chaque génération remplace la précédente.
+   ------------------------------------------------------------ */
+
+/* Rapport renvoyé par les routes ci-dessous (tous les champs à null / 0 / false si jamais généré) :
+   { status: "en_cours" | "ok" | "erreur" | null,   ← état de la dernière génération
+     content: { synthese_executive: [str], points_cles: [str], commentaire_perte: str,
+                commentaires_indicateurs: [{ cle, commentaire }],
+                leviers: [{ titre, constat, actions: [str], gain_attendu, indicateur_suivi }],
+                message_conclusion: str } | null,    ← textes de la dernière génération réussie
+     page_count: number | null, errors: [str] | null, input_tokens, output_tokens,
+     generated_at: ISO | null, pdf_available: bool }
+   Une génération en erreur laisse en place la version précédente (content, PDF). */
+
+/* GET /api/companies/audits/<audit_id>/report/ → rapport. 404 si l'audit n'existe pas. */
+export function getRapport(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/report/`, { signal });
+}
+
+/* POST /api/companies/audits/<audit_id>/report/generate/ → rapport (status « ok » ou « erreur »).
+   Synchrone : rédaction LLM puis mise en page, une à deux minutes.
+   409 : questionnaire non terminé, génération déjà en cours, lien Calendly non configuré ;
+   422 : secteur sans moteur de calcul. */
+export function genererRapport(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/report/generate/`, { method: "POST", signal });
+}
+
+/* GET /api/companies/audits/<audit_id>/report/pdf/ → Blob du PDF (dernière version).
+   Le nom de fichier du back (Content-Disposition) n'est pas lisible en CORS : le front le recompose.
+   404 si aucun PDF. */
+export function getRapportPdf(auditId, { signal } = {}) {
+  return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/report/pdf/?disposition=inline`, {
+    signal,
+    format: "blob",
+    headers: { Accept: "application/pdf, application/json" }
+  });
 }

@@ -3,64 +3,70 @@
 import Card, { CardHead } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { IaBlock, IaPhase, IaSrc } from "@/components/ui/Ia";
-import { Placeholder } from "@/components/ui/Misc";
-import { ModalActions } from "@/components/ui/Modal";
-import { useUi } from "@/context/UiContext";
+import { CompositionRapport } from "@/components/rapports/RapportSections";
+import { STATUT_RAPPORT, dateHeure, nomFichierRapport } from "@/lib/rapport";
+import { groupe } from "@/lib/format";
 
-const TONS = [
-  <>Factuel &amp; chiffré <span className="hint">(défaut)</span></>,
-  "Pédagogique — dirigeant non financier",
-  "Direct — orienté décision rapide"
-];
-
-export default function RapportsAside({ version }) {
-  const { toast, openModal, closeModal } = useUi();
-
-  const apercuPleinEcran = () => openModal(
-    <>
-      <h2>Aperçu — Audit Alumny {version}</h2>
-      <p className="small muted">
-        11 pages · synthèse rédigée par le Copilote · CTA Calendly en dernière page.
-      </p>
-      <Placeholder className="mt" style={{ height: 380 }}>
-        rendu PDF plein écran<br />(visionneuse)
-      </Placeholder>
-      <ModalActions><button className="btn" type="button" onClick={closeModal}>Fermer</button></ModalActions>
-    </>
-  );
+/* Rapport actuel : état, date, téléchargement. */
+function RapportActuel({ rapport, pdf, client, enCours }) {
+  const existe = Boolean(rapport?.pdf_available);
+  const statut = enCours ? STATUT_RAPPORT.en_cours : STATUT_RAPPORT[rapport?.status];
+  const tokens = (rapport?.input_tokens ?? 0) + (rapport?.output_tokens ?? 0);
 
   return (
-    <aside className="col gap-l">
-      <Card className="preview-card">
-        <CardHead><h3>Aperçu</h3><Badge tone="gold">{version}</Badge></CardHead>
+    <Card className="preview-card">
+      <CardHead>
+        <h3>Rapport actuel</h3>
+        {statut ? <Badge tone={statut.tone} dot>{statut.label}</Badge> : <Badge tone="ink">jamais généré</Badge>}
+      </CardHead>
 
-        <div className="pdf">
-          <div className="pdf-cover">
-            <span className="pdf-brand">ALUMNY</span>
-            <h4>Audit de performance<br />opérationnelle</h4>
-            <span className="pdf-client">Bâti Duran SARL · Août 2026</span>
-            <div className="pdf-gauge"><b>68</b><span>/100</span></div>
-            <span className="pdf-money">47 800 € de perte sèche annuelle estimée</span>
-          </div>
-          <div className="pdf-lines">
-            <span /><span /><span style={{ width: "70%" }} />
-            <Placeholder style={{ height: 52, margin: "8px 0" }}>graphique comparatif marché</Placeholder>
-            <span /><span style={{ width: "84%" }} />
-          </div>
-        </div>
+      {existe ? (
+        <dl className="rp-meta small">
+          <div><dt>Généré le</dt><dd>{dateHeure(rapport.generated_at) ?? "—"}</dd></div>
+          <div><dt>Pages</dt><dd>{rapport.page_count ?? "—"}</dd></div>
+          {tokens > 0 && (
+            <div>
+              <dt>Tokens LLM</dt>
+              <dd className="mono">{groupe(rapport.input_tokens)} entrée · {groupe(rapport.output_tokens)} sortie</dd>
+            </div>
+          )}
+        </dl>
+      ) : (
+        <p className="small muted">Aucun PDF pour cet audit.</p>
+      )}
 
+      {existe && (
         <div className="row gap-s mt">
-          <button className="btn btn-ghost btn-s grow" type="button" onClick={apercuPleinEcran}>
-            Aperçu plein écran
-          </button>
-          <button
-            className="btn btn-s grow" type="button"
-            onClick={() => toast(`Téléchargement du PDF (${version}) — 2,3 Mo.`)}
-          >
-            Télécharger
-          </button>
+          {pdf.url ? (
+            <>
+              <a className="btn btn-s grow" href={pdf.url} download={nomFichierRapport(client, rapport.generated_at)}>
+                Télécharger
+              </a>
+              <a className="btn btn-ghost btn-s grow" href={pdf.url} target="_blank" rel="noopener noreferrer">
+                Ouvrir dans un onglet
+              </a>
+            </>
+          ) : (
+            <button className="btn btn-s grow" type="button" disabled>
+              {pdf.encours ? "Chargement du PDF…" : "PDF indisponible"}
+            </button>
+          )}
         </div>
-      </Card>
+      )}
+
+      <p className="hint mt-s">
+        Une seule version est conservée : régénérer remplace ce PDF (il reste en place si la génération échoue).
+      </p>
+    </Card>
+  );
+}
+
+export default function RapportsAside({ rapport, pdf, client, enCours }) {
+  return (
+    <aside className="col gap-l">
+      <RapportActuel rapport={rapport} pdf={pdf} client={client} enCours={enCours} />
+
+      <CompositionRapport pages={rapport?.pdf_available ? rapport.page_count : null} />
 
       <Card tint="blue">
         <CardHead><h3>Ce que voit le client</h3></CardHead>
@@ -84,18 +90,6 @@ export default function RapportsAside({ version }) {
         </ul>
         <IaSrc>conditionné à l&apos;existence d&apos;une boucle de retour terrain</IaSrc>
       </IaBlock>
-
-      <Card tint="gold">
-        <CardHead><h3>Ton de la synthèse</h3></CardHead>
-        <div className="col gap-s">
-          {TONS.map((label, i) => (
-            <label className="check" key={i}>
-              <input type="radio" name="ton" defaultChecked={i === 0} /> <span>{label}</span>
-            </label>
-          ))}
-        </div>
-        <p className="hint mt-s">Paramètre du Copilote de rédaction, appliqué à la régénération.</p>
-      </Card>
     </aside>
   );
 }

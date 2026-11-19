@@ -1,217 +1,118 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Card, { CardHead } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Note from "@/components/ui/Note";
-import Html from "@/components/ui/Html";
-import { IaBlock, IaOut, IaSrc, IaTag } from "@/components/ui/Ia";
-import { Field, Spinner, Table, TableWrap } from "@/components/ui/Misc";
+import { Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import RapportsAside from "@/components/rapports/RapportsAside";
-import {
-  CompositionRapport, ETAPES_GENERATION, GenerationRapport
-} from "@/components/rapports/GenerationRapport";
-import { useUser } from "@/context/UserContext";
+import { ApercuPdf, GenerationEnCours, TextesRediges } from "@/components/rapports/RapportSections";
+import { useRapport } from "@/components/rapports/useRapport";
 import { useUi } from "@/context/UiContext";
-import { heureCourante } from "@/lib/format";
 
-const VERSIONS_INITIALES = [
-  { v: "v3", date: "12/08/2026 09:14", par: "Ny Aina R.", motif: "Correction du délai de paiement extrait", statut: "remise au client" },
-  { v: "v2", date: "11/08/2026 17:02", par: "Tafita A.", motif: "Ajout du comparatif marché", statut: "archivée" },
-  { v: "v1", date: "11/08/2026 11:48", par: "Tafita A.", motif: "Génération initiale", statut: "archivée" }
-];
-
-const SYNTHESE_INITIALE = `Sur les trois devis analysés, votre main-d'œuvre est facturée 42,00 €/h alors que son
-  coût horaire chargé réel ressort à 29,05 €/h : la marge existe, mais elle est absorbée par des délais de paiement
-  de 75 jours, supérieurs au plafond légal de 60 jours. À volume constant, la perte sèche annuelle estimée atteint
-  47 800 €, soit environ 3 980 € par mois.
-  <span class="ia-src">RAG sur la base de connaissance métier Alumny + résultats de calcul du dossier</span>`;
-
-const SYNTHESE_REFORMULEE = `Votre entreprise sous-facture sa main-d'œuvre : 42,00 €/h vendus pour 29,05 €/h de coût réel chargé,
-  alors que la médiane de votre marché local se situe à 34,10 €/h. Trois actions immédiates permettent de récupérer
-  l'essentiel des 47 800 € de perte sèche annuelle estimée, sans investissement.
-  <span class="ia-src">RAG sur la base métier Alumny · ton pédagogique</span>`;
-
-/* Étape 4 du dossier d'audit : composition, génération et historique du rapport PDF.
-   onGenere : appelé à chaque nouvelle version générée */
-export default function EtapeRapport({ onGenere }) {
-  const [versions, setVersions] = useState(VERSIONS_INITIALES);
-  const [generation, setGeneration] = useState({ encours: false, index: 0 });
-  const [synthese, setSynthese] = useState(SYNTHESE_INITIALE);
-  const [reformulation, setReformulation] = useState(false);
-  const timers = useRef([]);
-  const { user } = useUser();
+/* Étape 5 du dossier d'audit : génération du rapport PDF remis au client (une seule version,
+   remplacée à chaque génération), aperçu et relecture des textes rédigés.
+   - onGenere : appelé quand une génération réussit ;
+   - onQuestions : retour à l'étape Questions (le rapport exige un questionnaire terminé). */
+export default function EtapeRapport({ auditId, client, onGenere, onQuestions }) {
   const { toast, openModal, closeModal } = useUi();
+  const {
+    rapport, termine, indicateurs, chargement, generation, enCoursAilleurs, pdf,
+    recharger, rechargerPdf, generer
+  } = useRapport({ auditId, toast, onGenere });
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  if (chargement.encours && !rapport) return <Spinner />;
 
-  /* ---------- Génération d'une nouvelle version ---------- */
-  const generer = () => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    setGeneration({ encours: true, index: 0 });
-
-    ETAPES_GENERATION.forEach((_, i) => {
-      timers.current.push(setTimeout(() => {
-        if (i === ETAPES_GENERATION.length - 1) {
-          setGeneration({ encours: false, index: ETAPES_GENERATION.length });
-          onGenere?.();
-          setVersions(list => {
-            const nom = "v" + (list.length + 1);
-            toast(`Rapport <b>${nom}</b> généré — 11 pages, prêt à remettre.`, "ok");
-            return [{
-              v: nom,
-              date: "12/08/2026 " + heureCourante(false),
-              par: user.nom,
-              motif: "Régénération manuelle",
-              statut: "prête à remettre"
-            }, ...list];
-          });
-        } else {
-          setGeneration({ encours: true, index: i + 1 });
-        }
-      }, (i + 1) * 700));
-    });
-  };
-
-  /* ---------- Synthèse dirigeant ---------- */
-  const reformuler = () => {
-    setReformulation(true);
-    timers.current.push(setTimeout(() => {
-      setReformulation(false);
-      setSynthese(SYNTHESE_REFORMULEE);
-      toast("Synthèse reformulée — relis avant de régénérer le PDF.", "gold");
-    }, 900));
-  };
-
-  const editerSynthese = () => openModal(
-    <>
-      <h2>Éditer la synthèse dirigeant</h2>
-      <p className="small muted">
-        Le texte édité remplace celui du Copilote dans la prochaine version générée.
+  if (chargement.erreur) {
+    return (
+      <p className="muted">
+        Rapport indisponible : {chargement.erreur}{" "}
+        <button className="btn btn-ghost btn-s" type="button" onClick={recharger}>Réessayer</button>
       </p>
-      <Field label="Texte" className="mt">
-        <textarea
-          style={{ minHeight: 150 }}
-          defaultValue={synthese.replace(/<[^>]+>/g, "").trim()}
-        />
-      </Field>
-      <ModalActions>
-        <button className="btn btn-ghost" type="button" onClick={closeModal}>Annuler</button>
-        <button
-          className="btn" type="button"
-          onClick={() => { closeModal(); toast("Synthèse remplacée par la version du consultant.", "ok"); }}
-        >
-          Enregistrer
-        </button>
-      </ModalActions>
-    </>
-  );
+    );
+  }
 
-  /* ---------- Historique ---------- */
-  const supprimerVersion = () => openModal(
-    <>
-      <h2>Supprimer cette version ?</h2>
-      <p>
-        Réservé aux erreurs de génération. Le <b>log</b> de la version est conservé même après suppression du fichier.
-      </p>
-      <ModalActions>
-        <button className="btn btn-ghost" type="button" onClick={closeModal}>Annuler</button>
-        <button
-          className="btn btn-danger" type="button"
-          onClick={() => { closeModal(); toast("Version supprimée — log conservé."); }}
-        >
-          Supprimer
-        </button>
-      </ModalActions>
-    </>
-  );
+  const enCours = generation.encours || enCoursAilleurs;
+  const existe = Boolean(rapport?.pdf_available);
+  const bloque = termine === false;
+  const echec = rapport?.status === "erreur" && !enCours;
+
+  const lancer = () => {
+    if (!existe) {
+      generer();
+      return;
+    }
+    openModal(
+      <>
+        <h2>Régénérer le rapport ?</h2>
+        <p>
+          Le PDF actuel sera <b>remplacé</b> : une seule version est conservée par audit.
+          Si la génération échoue, il reste en place.
+        </p>
+        <p className="small muted">Rédaction par le LLM puis mise en page : une à deux minutes.</p>
+        <ModalActions>
+          <button className="btn btn-ghost" type="button" onClick={closeModal}>Annuler</button>
+          <button className="btn btn-gold" type="button" onClick={() => { closeModal(); generer(); }}>
+            Régénérer
+          </button>
+        </ModalActions>
+      </>
+    );
+  };
 
   return (
     <>
       <div className="row-between mb">
-        <span className="hint">Chaque génération crée une nouvelle version : l&apos;historique est conservé.</span>
-        <button className="btn btn-gold" type="button" disabled={generation.encours} onClick={generer}>
-          Générer une nouvelle version
+        <span className="hint">
+          {existe
+            ? "Le PDF ci-dessous est celui remis au client. Relisez-le avant de l'envoyer."
+            : "Le rapport est rédigé par le LLM à partir du cockpit, puis mis en page en PDF."}
+        </span>
+        <button className="btn btn-gold" type="button" disabled={enCours || bloque} onClick={lancer}>
+          {enCours ? "Génération en cours…" : existe ? "Régénérer le rapport" : "Générer le rapport"}
         </button>
       </div>
 
       <div className="rap-cols">
         <section className="col gap-l">
-          <CompositionRapport />
-          <GenerationRapport etat={generation} />
-
-          <IaBlock>
-            <CardHead>
-              <h3>Synthèse dirigeant proposée</h3>
-              <IaTag phase={0}>Rédaction</IaTag>
-            </CardHead>
-
-            {reformulation
-              ? <IaOut><Spinner /> reformulation en cours…</IaOut>
-              : <Html as="div" className="ia-out" html={synthese} />}
-
-            <div className="row gap-s mt wrap">
-              <button className="btn btn-s btn-gold" type="button" onClick={reformuler}>Reformuler</button>
-              <button className="btn btn-ghost btn-s" type="button" onClick={editerSynthese}>
-                Éditer avant intégration
-              </button>
+          {bloque && !enCours && (
+            <div className="note note-gold">
+              <span className="note-ico">⚠</span>
+              <div className="grow">
+                Le questionnaire de l&apos;agent n&apos;est pas terminé : le rapport ne peut être généré
+                qu&apos;une fois le dernier tour passé.
+                <div className="mt-s">
+                  <button className="btn btn-s" type="button" onClick={onQuestions}>Terminer le questionnaire →</button>
+                </div>
+              </div>
             </div>
-            <p className="hint mt-s">
-              Le consultant relit et valide : aucun texte généré ne part au client sans relecture.
-            </p>
-          </IaBlock>
+          )}
 
-          <Card>
-            <CardHead><h2>Historique des versions</h2></CardHead>
-            <TableWrap>
-              <Table>
-                <thead>
-                  <tr><th>Version</th><th>Généré le</th><th>Par</th><th>Motif</th><th>Statut</th><th /></tr>
-                </thead>
-                <tbody>
-                  {versions.map((v, i) => (
-                    <tr key={v.v} className={i === 0 ? "v-current" : undefined}>
-                      <td className="cell-strong">{v.v}</td>
-                      <td className="small">{v.date}</td>
-                      <td className="small">{v.par}</td>
-                      <td className="small">{v.motif}</td>
-                      <td>
-                        {i === 0
-                          ? <Badge tone="ok" dot>{v.statut}</Badge>
-                          : <Badge tone="ink">{v.statut}</Badge>}
-                      </td>
-                      <td>
-                        <div className="tbl-actions">
-                          <button
-                            className="btn btn-icon" type="button" title="Télécharger"
-                            onClick={() => toast(`Téléchargement du PDF (${v.v}) — 2,3 Mo.`)}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            className="btn btn-icon" type="button" title="Supprimer cette version"
-                            onClick={supprimerVersion}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </TableWrap>
+          {enCours && <GenerationEnCours local={generation.encours} />}
 
-            <Note tone="gold" ico="↻" className="mt">
-              Un rapport n&apos;est <b>jamais édité directement</b> : toute correction passe par une régénération
-              en nouvelle version, pour garder un historique fiable de ce qui a été réellement remis au client.
-            </Note>
-          </Card>
+          {generation.erreur && !enCours && (
+            <div className="note note-bad">
+              <span className="note-ico">✕</span>
+              <span>{generation.erreur}</span>
+            </div>
+          )}
+
+          {echec && (
+            <div className="note note-bad">
+              <span className="note-ico">✕</span>
+              <div className="grow">
+                <b>La dernière génération a échoué.</b>
+                {existe && " La version précédente du rapport reste disponible."}
+                {rapport.errors?.length > 0 && (
+                  <ul className="rp-errors">{rapport.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          <ApercuPdf existe={existe} pdf={pdf} onReessayer={rechargerPdf} />
+
+          {rapport?.content && <TextesRediges content={rapport.content} indicateurs={indicateurs} />}
         </section>
 
-        <RapportsAside version={versions[0].v} />
+        <RapportsAside rapport={rapport} pdf={pdf} client={client} enCours={enCours} />
       </div>
     </>
   );
