@@ -8,7 +8,7 @@ import { IaSrc, IaTag } from "@/components/ui/Ia";
 import { Spinner } from "@/components/ui/Misc";
 import { ModalActions } from "@/components/ui/Modal";
 import CockpitHero, { Illustratif } from "@/components/cockpit/CockpitHero";
-import { Controles, DetailCalcul, DonneesEntree, Indicateurs } from "@/components/cockpit/CockpitSections";
+import { Controles, DetailCalcul, DetailLignes, DonneesEntree, Indicateurs } from "@/components/cockpit/CockpitSections";
 import { useCockpit } from "@/components/cockpit/useCockpit";
 import { MOTEURS } from "@/data/moteurs";
 import { SECTEUR_MOTEUR } from "@/lib/cockpit";
@@ -16,9 +16,10 @@ import { useUi } from "@/context/UiContext";
 
 /* Étape 4 du dossier d'audit : résultats du moteur de calcul du secteur (GET …/cockpit/).
    Score de santé, comparatif marché et leviers restent illustratifs tant qu'ils ne sont pas calculés.
-   onSuivant : résultats validés → génération du rapport · onCompleter : retour aux questions de l'agent */
-export default function EtapeCockpit({ dossier, onSuivant, onCompleter }) {
-  const { cockpit, encours, erreur, exemple, recharger } = useCockpit(dossier.id);
+   onSuivant : résultats validés → génération du rapport · onCompleter : retour aux questions de l'agent
+   onDocuments : retour au dépôt de pièces (données que seul un document peut fournir) */
+export default function EtapeCockpit({ dossier, onSuivant, onCompleter, onDocuments }) {
+  const { cockpit, encours, erreur, recharger } = useCockpit(dossier.id);
   const [leviersEnCours, setLeviersEnCours] = useState(false);
   const timer = useRef(null);
   const { toast, openModal, closeModal } = useUi();
@@ -79,13 +80,6 @@ export default function EtapeCockpit({ dossier, onSuivant, onCompleter }) {
         généré à partir de ces résultats. Les blocs marqués <b>illustratif</b> sont des exemples, pas encore calculés.
       </Note>
 
-      {exemple && (
-        <Note tone="bad" ico="⚠" className="mb">
-          <b>Données d&apos;exemple.</b> La route <code>GET /api/companies/audits/&lt;id&gt;/cockpit/</code> n&apos;existe
-          pas encore côté back : cette réponse fictive (affichée en développement seulement) montre le format attendu.
-        </Note>
-      )}
-
       {encours && !cockpit ? (
         <div className="row muted"><Spinner /> Calcul du cockpit…</div>
       ) : erreur ? (
@@ -97,8 +91,9 @@ export default function EtapeCockpit({ dossier, onSuivant, onCompleter }) {
         <div className={encours ? "is-loading" : undefined}>
           <CockpitHero cockpit={cockpit} illustratif={illustratif} secteur={secteur} />
 
-          <DonneesEntree entrees={cockpit.entrees} secteur={secteur} onCompleter={onCompleter} />
+          <DonneesEntree entrees={cockpit.entrees} secteur={secteur} onCompleter={onCompleter} onDocuments={onDocuments} />
           <Indicateurs indicateurs={cockpit.indicateurs} entrees={cockpit.entrees} secteur={secteur} />
+          {cockpit.entrees.filter(e => e.lignes?.length).map(e => <DetailLignes key={e.cle} entree={e} />)}
           <DetailCalcul etapes={cockpit.etapes_calcul} />
 
           <section className="grid g-2 mt">

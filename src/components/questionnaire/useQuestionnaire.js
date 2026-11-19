@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { genererQuestionnaire, listerDocuments, listerQuestionnaires, repondreQuestion } from "@/lib/api";
+import { genererQuestionnaire, getCockpit, listerDocuments, listerQuestionnaires, repondreQuestion } from "@/lib/api";
 
 /* Intervalle de relecture d'un tour généré ailleurs (autre onglet, visite précédente). */
 const POLL_MS = 5000;
@@ -18,7 +18,9 @@ const remplacerQuestion = (tours, question) => tours.map(t => (
 /* Questionnaire adaptatif d'un audit : tours de questions générés par l'agent et réponses du dirigeant.
    - le premier tour est généré automatiquement s'il n'en existe aucun ;
    - un tour « en_cours » côté serveur (génération lancée hors de cette page) est relu jusqu'à sa fin ;
-   - le tour suivant n'est généré qu'à la demande (genererSuite), une fois toutes les questions traitées. */
+   - le tour suivant n'est généré qu'à la demande (generer), une fois toutes les questions traitées ;
+   - les entrées du cockpit (GET …/cockpit/, sans LLM) donnent le libellé de la `variable` d'une question
+     et ce qu'il reste à demander quand l'agent rend un tour vide sans que le questionnaire soit terminé. */
 export function useQuestionnaire({ auditId, toast }) {
   const [tours, setTours] = useState([]);
   const [termine, setTermine] = useState(false);
@@ -28,6 +30,7 @@ export function useQuestionnaire({ auditId, toast }) {
   /* tool_calls des tours générés pendant cette visite (non enregistrés en base) : { [idTour]: [...] } */
   const [enquetes, setEnquetes] = useState({});
   const [documents, setDocuments] = useState({});
+  const [entreesCockpit, setEntreesCockpit] = useState([]);
   const [envois, setEnvois] = useState({});
   const [tentative, setTentative] = useState(0);
   const ctrlGeneration = useRef(null);
@@ -67,6 +70,17 @@ export function useQuestionnaire({ auditId, toast }) {
     return () => ctrl.abort();
   }, [auditId]);
 
+  /* Entrées du cockpit, relues à chaque nouveau tour « ok » (ce qui reste à demander a pu changer) */
+  const nbToursOk = tours.filter(t => t.status === "ok").length;
+  useEffect(() => {
+    if (!auditId) return;
+    const ctrl = new AbortController();
+    getCockpit(auditId, { signal: ctrl.signal })
+      .then(c => setEntreesCockpit(Array.isArray(c?.entrees) ? c.entrees : []))
+      .catch(e => { if (e.name !== "AbortError") console.log("Lecture du cockpit impossible :", e); });
+    return () => ctrl.abort();
+  }, [auditId, nbToursOk]);
+
   const recharger = useCallback(() => setTentative(t => t + 1), []);
 
   /* Relecture silencieuse (après un conflit ou pendant une génération faite ailleurs) */
@@ -94,10 +108,10 @@ export function useQuestionnaire({ auditId, toast }) {
         return;
       }
       setGeneration({ encours: false, erreur: null, errors: [] });
-      toast?.(finished
-        ? "Questionnaire terminé : l'agent n'a plus de question."
-        : `Tour ${tour.round_number} généré : ${tour.questions.length} question${tour.questions.length > 1 ? "s" : ""}.`,
-      "ok");
+      const nb = tour.questions.length;
+      if (finished) toast?.("Questionnaire terminé : l'agent n'a plus de question.", "ok");
+      else if (!nb) toast?.("L'agent n'a pas posé de question, mais il reste des données à demander pour le cockpit.", "gold");
+      else toast?.(`Tour ${tour.round_number} généré : ${nb} question${nb > 1 ? "s" : ""}.`, "ok");
     } catch (e) {
       if (e.name === "AbortError") return;
       setGeneration({ encours: false, erreur: e.message, errors: [] });
@@ -144,7 +158,7 @@ export function useQuestionnaire({ auditId, toast }) {
   }, [toast, resynchroniser]);
 
   return {
-    tours, termine, chargement, generation, enCoursAilleurs, enquetes, documents, envois,
+    tours, termine, chargement, generation, enCoursAilleurs, enquetes, documents, entreesCockpit, envois,
     recharger, generer, repondre
   };
 }

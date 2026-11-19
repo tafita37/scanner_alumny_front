@@ -168,3 +168,7 @@
   .calc-eq { width: 100%; flex: none; }
   .calc-out { margin-left: auto; }
 }
+
+/* Détail ligne à ligne d'une entrée (marges par produit) */
+.tbl tr.is-off td { color: var(--ink-faint); }
+.tbl tfoot td { padding: 12px 16px; border-top: 1px solid var(--line-strong); background: var(--blue-soft); font-size: 13.5px; }

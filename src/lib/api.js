@@ -264,13 +264,16 @@ export function uploaderDocuments(auditId, files, { signal } = {}) {
    Question : { id, display_order, label, rationale,
                 answer_type: "montant" | "pourcentage" | "nombre" | "date" | "oui_non" | "choix" | "texte",
                 choices: [str] | null, unit: str | null, document_ids: [int],
+                variable: str | null (clé de l'entrée du cockpit qu'alimente la réponse),
                 suggested_answer, suggested_answer_source: str | null,
                 status: "en_attente" | "repondue" | "ignoree", answer }
    Tour : { id, round_number, status: "en_cours" | "ok" | "erreur", analysis, input_tokens, output_tokens, questions }
    ------------------------------------------------------------ */
 
 /* GET /api/companies/audits/<audit_id>/questionnaires/ → { finished, questionnaires: [tour] },
-   tous les tours (y compris en erreur, sans question), du premier au dernier. 404 si l'audit n'existe pas. */
+   tous les tours (y compris en erreur, sans question), du premier au dernier. 404 si l'audit n'existe pas.
+   finished : dernier tour « ok » sans question ET plus aucune entrée obligatoire du cockpit à demander ;
+   un tour vide avec finished = false autorise un tour supplémentaire. */
 export function listerQuestionnaires(auditId, { signal } = {}) {
   return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/questionnaires/`, { signal });
 }
@@ -298,7 +301,9 @@ export function repondreQuestion(questionId, body) {
    { secteur: "BTP" | "SERVICES" | "INDUSTRIE",
      entrees: [{ cle, label, valeur: number | null, unite: str | null,
                  source: "comptes_annuels" | "api" | "documents" | "questionnaire" | "parametre" | null,
-                 detail: str | null, statut: "ok" | "manquant" | "non_defini" }],
+                 detail: str | null, statut: "ok" | "manquant" | "non_defini",
+                 demandable: bool (false : seul un document peut la fournir, l'agent ne peut pas la demander),
+                 lignes: [{…}] | null (détail d'une valeur agrégée, ex. marges par produit) }],
      indicateurs: [{ cle, nom, valeur: number | null, unite, formule, pivot: bool, comparaison: str | null,
                      manquants: [cle d'entrée], statut: "ok" | "manquant" | "non_defini" }],
      etapes_calcul: [{ libelle, equation, resultat: number | null, unite }],
@@ -308,7 +313,8 @@ export function repondreQuestion(questionId, body) {
      controles: [{ ok: bool, texte }] }
    statut : « manquant » = donnée absente (à obtenir par le questionnaire ou un document) ;
             « non_defini » = méthode de calcul pas encore définie.
-   Unités : pourcentages en points (20 = 20 %). 404 { detail } si l'audit n'existe pas. */
+   Unités : pourcentages en points (20 = 20 %).
+   404 { detail } si l'audit n'existe pas ; 422 { detail } si son secteur n'a pas de moteur de calcul. */
 export function getCockpit(auditId, { signal } = {}) {
   return apiFetch(`/api/companies/audits/${encodeURIComponent(auditId)}/cockpit/`, { signal });
 }
